@@ -105,3 +105,5 @@ Error responses:
 - `models/student.py` has `add_student()` and `find_by_email()` functions —
   when the DB task starts, only the internals of these two functions need
   to change to real SQL queries. Controllers/routes stay the same.
+
+
