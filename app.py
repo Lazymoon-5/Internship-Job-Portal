@@ -19,7 +19,7 @@ def create_app():
     def health_check():
         return jsonify({
             "status": "ok",
-            "message": "Placify backend is running."
+            "message": "CampusBridge backend is running."
         })
 
     return app
