@@ -12,7 +12,6 @@ class Config:
     DEBUG = os.environ.get("DEBUG", "True") == "True"
     PORT = int(os.environ.get("PORT", 5000))
 
-origin/Neeraj-Backend
     # DB_HOST = os.environ.get("DB_HOST")
     # DB_USER = os.environ.get("DB_USER")
     # DB_PASSWORD = os.environ.get("DB_PASSWORD")
