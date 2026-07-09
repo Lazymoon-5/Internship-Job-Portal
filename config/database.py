@@ -56,20 +56,19 @@ def is_db_available() -> bool:
 
 
 def get_pool():
-    global _pool
-    if _pool is None:
-        from mysql.connector import pooling
-        _pool = pooling.MySQLConnectionPool(
-            pool_name="placify_pool",
-            pool_size=5,
-            host=DB_CONFIG["host"],
-            port=DB_CONFIG["port"],
-            user=DB_CONFIG["user"],
-            password=DB_CONFIG["password"],
-            database=DB_CONFIG["database"],
-            charset=DB_CONFIG["charset"],
-            connection_timeout=5,
-        )
+    _pool = pooling.MySQLConnectionPool(
+    pool_name="placify_pool",
+    pool_size=5,
+    host=DB_CONFIG["host"],
+    port=DB_CONFIG["port"],
+    user=DB_CONFIG["user"],
+    password=DB_CONFIG["password"],
+    database=DB_CONFIG["database"],
+    charset=DB_CONFIG["charset"],
+    connection_timeout=5,
+
+    ssl_disabled=False
+    )
     return _pool
 
 
