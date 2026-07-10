@@ -1,5 +1,11 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 class Config:
     """
@@ -12,6 +18,7 @@ class Config:
     DEBUG = os.environ.get("DEBUG", "True") == "True"
     PORT = int(os.environ.get("PORT", 5000))
 
+    # Placeholder for future DB config (MySQL likely, per project plan)
     # DB_HOST = os.environ.get("DB_HOST")
     # DB_USER = os.environ.get("DB_USER")
     # DB_PASSWORD = os.environ.get("DB_PASSWORD")

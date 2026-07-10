@@ -4,6 +4,8 @@ from controllers.client_controller import (
     login_client,
     forgot_password,
     reset_password,
+    verify_registration_otp,
+    resend_otp,
 )
 
 client_bp = Blueprint("client_routes", __name__, url_prefix="/api/client")
@@ -20,6 +22,20 @@ def register():
 def login():
     data = request.get_json(silent=True) or {}
     response, status_code = login_client(data)
+    return jsonify(response), status_code
+
+
+@client_bp.route("/verify-otp", methods=["POST"])
+def verify_otp_route():
+    data = request.get_json(silent=True) or {}
+    response, status_code = verify_registration_otp(data)
+    return jsonify(response), status_code
+
+
+@client_bp.route("/resend-otp", methods=["POST"])
+def resend_otp_route():
+    data = request.get_json(silent=True) or {}
+    response, status_code = resend_otp(data)
     return jsonify(response), status_code
 
 

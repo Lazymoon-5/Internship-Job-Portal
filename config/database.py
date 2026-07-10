@@ -1,13 +1,12 @@
 """
 Database connection module — MySQL, using mysql-connector-python.
 
-DB_CONFIGURED (below) auto-detects whether real credentials are present
-in .env. If DB_HOST is blank, or a connection attempt fails, the app
-falls back to in-memory storage (see models/student.py and
-models/client.py) so the rest of the app — OTP, email, Google login —
-can still be tested while waiting on real database credentials. Once
-real credentials are added, this switches to MySQL automatically, no
-code changes needed.
+DB_CONFIGURED auto-detects whether real credentials are present in .env.
+If DB_HOST is blank, or a connection attempt fails, the app falls back
+to in-memory storage (see models/student.py and models/client.py) so
+the rest of the app can still be tested while waiting on real database
+credentials. Once real credentials are added, this switches to MySQL
+automatically, no code changes needed.
 """
 
 import os
@@ -56,22 +55,9 @@ def is_db_available() -> bool:
 
 
 def get_pool():
-    _pool = pooling.MySQLConnectionPool(
-    pool_name="placify_pool",
-    pool_size=5,
-    host=DB_CONFIG["host"],
-    port=DB_CONFIG["port"],
-    user=DB_CONFIG["user"],
-    password=DB_CONFIG["password"],
-    database=DB_CONFIG["database"],
-    charset=DB_CONFIG["charset"],
-    connection_timeout=5,
-    ssl_disabled=False
-)
     global _pool
     if _pool is None:
         from mysql.connector import pooling
-
         _pool = pooling.MySQLConnectionPool(
             pool_name="placify_pool",
             pool_size=5,
@@ -82,10 +68,9 @@ def get_pool():
             database=DB_CONFIG["database"],
             charset=DB_CONFIG["charset"],
             connection_timeout=5,
-            ssl_disabled=False
         )
-
     return _pool
+
 
 def get_db_connection():
     return get_pool().get_connection()
@@ -100,6 +85,8 @@ def init_db():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+
+        # ---- Student tables ----
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS students (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -134,6 +121,8 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+
+        # ---- Client tables ----
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS clients (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -167,6 +156,7 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+
         conn.commit()
         cursor.close()
         print("[DB] Connected and tables verified.")

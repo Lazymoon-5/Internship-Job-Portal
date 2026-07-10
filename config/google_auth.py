@@ -59,3 +59,8 @@ def verify_google_token(id_token_str: str):
         return payload, None
     except ValueError as e:
         return None, f"Invalid Google token: {str(e)}"
+    except Exception as e:
+        # Catches network errors (e.g. can't reach Google's cert servers),
+        # or any other unexpected failure — so this never crashes the
+        # request with a raw 500, always returns a clean JSON error.
+        return None, f"Google verification failed: {str(e)}"

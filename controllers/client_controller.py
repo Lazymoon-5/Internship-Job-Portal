@@ -1,33 +1,31 @@
 """
 Client (Company) controller — business logic for register/login/
-forgot-password/reset-password.
+forgot-password/reset-password/OTP verification.
 
-Kept separate from routes so that when MySQL is added later,
-only the model layer changes, not this logic.
+Mirrors controllers/student_controller.py exactly, but for Clients.
 """
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.client import (
-    Client,
     add_client,
     find_by_email,
     update_password,
+    mark_verified,
     create_reset_token,
     get_email_for_token,
     invalidate_token,
+    create_otp,
+    verify_otp,
 )
+from config.email_service import send_otp_email, send_reset_password_email
 
 
 def register_client(data):
     """
-    Expects data = {
-        "company_name": str,
-        "email": str,
-        "password": str,
-        "industry": str,
-        "website": str (optional)
-    }
-    Returns (response_dict, status_code)
+    Expects data = {company_name, email, password, industry, website (optional)}
+
+    Creates the client as UNVERIFIED and sends an OTP to their email.
+    They must call verify_registration_otp before they can log in.
     """
     required_fields = ["company_name", "email", "password", "industry"]
     missing = [f for f in required_fields if not data.get(f)]
@@ -47,29 +45,90 @@ def register_client(data):
 
     password_hash = generate_password_hash(data["password"])
 
-    client = Client(
-        company_name=data["company_name"].strip(),
-        email=email,
-        password_hash=password_hash,
-        industry=data["industry"].strip(),
-        website=(data.get("website") or "").strip(),
-    )
-    add_client(client)
+    client = add_client({
+        "company_name": data["company_name"].strip(),
+        "email": email,
+        "password_hash": password_hash,
+        "industry": data["industry"].strip(),
+        "website": (data.get("website") or "").strip(),
+    })
+
+    otp_code = create_otp(email, purpose="registration")
+    email_sent = send_otp_email(email, otp_code)
+
+    response = {
+        "success": True,
+        "message": "Registered successfully. An OTP has been sent to your email — verify it to activate your account.",
+        "client": client.to_dict(),
+        "email_sent": email_sent,
+    }
+    if not email_sent:
+        response["dev_otp"] = otp_code
+
+    return response, 201
+
+
+def verify_registration_otp(data):
+    """
+    Expects data = {email, otp}
+    """
+    email = (data.get("email") or "").strip().lower()
+    otp_code = (data.get("otp") or "").strip()
+
+    if not email or not otp_code:
+        return {
+            "success": False,
+            "message": "Email and OTP are required."
+        }, 400
+
+    success, message = verify_otp(email, otp_code, purpose="registration")
+
+    if not success:
+        return {"success": False, "message": message}, 400
+
+    mark_verified(email)
 
     return {
         "success": True,
-        "message": "Company registered successfully.",
-        "client": client.to_dict()
-    }, 201
+        "message": "Email verified successfully. You can now log in."
+    }, 200
+
+
+def resend_otp(data):
+    """
+    Expects data = {email, purpose} — purpose defaults to 'registration'
+    """
+    email = (data.get("email") or "").strip().lower()
+    purpose = (data.get("purpose") or "registration").strip()
+
+    if not email:
+        return {"success": False, "message": "Email is required."}, 400
+
+    client = find_by_email(email)
+    if not client:
+        return {"success": False, "message": "No account found with this email."}, 404
+
+    if purpose == "registration" and client.is_verified:
+        return {"success": False, "message": "This account is already verified."}, 400
+
+    otp_code = create_otp(email, purpose=purpose)
+    email_sent = send_otp_email(email, otp_code)
+
+    response = {
+        "success": True,
+        "message": "A new OTP has been sent to your email.",
+        "email_sent": email_sent,
+    }
+    if not email_sent:
+        response["dev_otp"] = otp_code
+
+    return response, 200
 
 
 def login_client(data):
     """
-    Expects data = {
-        "email": str,
-        "password": str
-    }
-    Returns (response_dict, status_code)
+    Expects data = {email, password}
+    Blocks login if the account hasn't verified its OTP yet.
     """
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
@@ -88,6 +147,13 @@ def login_client(data):
             "message": "Invalid email or password."
         }, 401
 
+    if not client.is_verified:
+        return {
+            "success": False,
+            "message": "Please verify your email with the OTP sent to you before logging in.",
+            "requires_verification": True
+        }, 403
+
     return {
         "success": True,
         "message": "Login successful.",
@@ -98,24 +164,19 @@ def login_client(data):
 def forgot_password(data):
     """
     Expects data = { "email": str }
-
-    NOTE: No real email service is wired up yet. For now this returns
-    the reset link directly in the response (and prints it to the
-    console) so the flow can be tested end-to-end. Once an email
-    provider is added, replace the print(...) line with an actual send.
+    Sends a real email via config/email_service.py. Falls back to
+    returning dev_reset_link in the response if email delivery fails,
+    so testing isn't blocked.
     """
     email = (data.get("email") or "").strip().lower()
 
     if not email:
-        return {
-            "success": False,
-            "message": "Email is required."
-        }, 400
+        return {"success": False, "message": "Email is required."}, 400
 
     client = find_by_email(email)
 
-    # Same generic message whether or not the email exists, to avoid
-    # letting people probe which emails are registered.
+    # Same generic message whether or not the email exists — prevents
+    # account enumeration.
     if not client:
         return {
             "success": True,
@@ -125,32 +186,25 @@ def forgot_password(data):
     token = create_reset_token(email)
     reset_link = f"http://localhost:3000/reset-password?token={token}"
 
-    print(f"[MOCK EMAIL] Password reset link for {email}: {reset_link}")
+    email_sent = send_reset_password_email(email, reset_link)
 
-    return {
+    response = {
         "success": True,
         "message": "If an account with this email exists, a password reset link has been sent.",
-        "dev_reset_link": reset_link
-    }, 200
+    }
+    if not email_sent:
+        response["dev_reset_link"] = reset_link
+
+    return response, 200
 
 
 def reset_password(data):
-    """
-    Expects data = {
-        "token": str,
-        "new_password": str,
-        "confirm_password": str
-    }
-    """
     token = data.get("token") or ""
     new_password = data.get("new_password") or ""
     confirm_password = data.get("confirm_password") or ""
 
     if not token:
-        return {
-            "success": False,
-            "message": "Reset token is required."
-        }, 400
+        return {"success": False, "message": "Reset token is required."}, 400
 
     if not new_password or not confirm_password:
         return {
@@ -159,10 +213,7 @@ def reset_password(data):
         }, 400
 
     if new_password != confirm_password:
-        return {
-            "success": False,
-            "message": "Passwords do not match."
-        }, 400
+        return {"success": False, "message": "Passwords do not match."}, 400
 
     if len(new_password) < 6:
         return {

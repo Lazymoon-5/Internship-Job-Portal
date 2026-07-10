@@ -1,19 +1,21 @@
 """
-Email sending module — using Brevo's HTTP API (not SMTP).
+Email sending module — using Resend's HTTP API (not SMTP).
 
 Why HTTP instead of SMTP: many free-tier hosts (including Render on
 lower plans) block outbound SMTP ports (587/465) to prevent spam abuse.
-Brevo's API works over regular HTTPS, which is never blocked, so this
+Resend's API works over regular HTTPS, which is never blocked, so this
 works reliably in production as well as locally.
 
 Reads credentials from environment variables (.env):
-    BREVO_API_KEY      — from Brevo dashboard -> Settings -> SMTP & API -> API Keys
-    BREVO_SENDER_EMAIL  — a verified sender email in your Brevo account
+    RESEND_API_KEY      — from Resend dashboard -> API Keys
+    RESEND_SENDER_EMAIL  — a verified sender email/domain in your Resend account
 
 SETUP:
-1. Sign up free at brevo.com
-2. Settings -> SMTP & API -> API Keys -> Generate a new API key
-3. Senders, Domains & Dedicated IPs -> Senders -> add + verify your email
+1. Sign up free at resend.com
+2. Dashboard -> API Keys -> Create API Key -> copy it (starts with "re_")
+3. Dashboard -> Domains -> add + verify a sender (or use their provided
+   test domain like "onboarding@resend.dev" while testing, which works
+   immediately with no verification needed)
 4. Put both values in .env (and in Render's Environment tab once deployed)
 """
 
@@ -26,35 +28,34 @@ try:
 except ImportError:
     pass
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL")
-BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_SENDER_EMAIL = os.environ.get("RESEND_SENDER_EMAIL", "onboarding@resend.dev")
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 def send_email(to_email: str, subject: str, body_html: str) -> bool:
     """
-    Sends an email via Brevo's HTTP API. Returns True if sent
+    Sends an email via Resend's HTTP API. Returns True if sent
     successfully, False otherwise. Never raises — logs the error and
     returns False, so a failed email doesn't crash the whole request.
     """
-    if not BREVO_API_KEY or not BREVO_SENDER_EMAIL:
-        print("[EMAIL] Skipped — BREVO_API_KEY or BREVO_SENDER_EMAIL not set in .env")
+    if not RESEND_API_KEY:
+        print("[EMAIL] Skipped — RESEND_API_KEY not set in .env")
         return False
 
     payload = {
-        "sender": {"email": BREVO_SENDER_EMAIL, "name": "Placify"},
-        "to": [{"email": to_email}],
+        "from": f"Placify <{RESEND_SENDER_EMAIL}>",
+        "to": [to_email],
         "subject": subject,
-        "htmlContent": body_html,
+        "html": body_html,
     }
     headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json",
     }
 
     try:
-        response = requests.post(BREVO_API_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(RESEND_API_URL, json=payload, headers=headers, timeout=10)
         if response.status_code in (200, 201):
             print(f"[EMAIL] Sent to {to_email}: {subject}")
             return True
