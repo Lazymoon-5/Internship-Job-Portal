@@ -58,6 +58,7 @@ def get_pool():
     global _pool
     if _pool is None:
         from mysql.connector import pooling
+
         _pool = pooling.MySQLConnectionPool(
             pool_name="placify_pool",
             pool_size=5,
@@ -68,7 +69,9 @@ def get_pool():
             database=DB_CONFIG["database"],
             charset=DB_CONFIG["charset"],
             connection_timeout=5,
+            ssl_disabled=False
         )
+
     return _pool
 
 
