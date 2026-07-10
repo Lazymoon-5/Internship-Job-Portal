@@ -1,24 +1,24 @@
 """
-Email sending module — real SMTP via Gmail.
+Email sending module — using Brevo's HTTP API (not SMTP).
 
-Uses Python's built-in smtplib, no extra dependency needed.
+Why HTTP instead of SMTP: many free-tier hosts (including Render on
+lower plans) block outbound SMTP ports (587/465) to prevent spam abuse.
+Brevo's API works over regular HTTPS, which is never blocked, so this
+works reliably in production as well as locally.
+
 Reads credentials from environment variables (.env):
-    EMAIL_ADDRESS   — the dummy Gmail address
-    EMAIL_APP_PASSWORD — the 16-character Gmail App Password
-                         (NOT the normal Gmail login password —
-                         Gmail blocks regular passwords for SMTP)
+    BREVO_API_KEY      — from Brevo dashboard -> Settings -> SMTP & API -> API Keys
+    BREVO_SENDER_EMAIL  — a verified sender email in your Brevo account
 
-HOW TO GET AN APP PASSWORD:
-1. Turn on 2-Step Verification on the Gmail account.
-2. Go to https://myaccount.google.com/apppasswords
-3. Generate one for "Mail" — copy the 16-character code.
-4. Put it in .env as EMAIL_APP_PASSWORD (no spaces).
+SETUP:
+1. Sign up free at brevo.com
+2. Settings -> SMTP & API -> API Keys -> Generate a new API key
+3. Senders, Domains & Dedicated IPs -> Senders -> add + verify your email
+4. Put both values in .env (and in Render's Environment tab once deployed)
 """
 
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 
 try:
     from dotenv import load_dotenv
@@ -26,47 +26,51 @@ try:
 except ImportError:
     pass
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-
-EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS")
-EMAIL_APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL")
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def send_email(to_email: str, subject: str, body_html: str) -> bool:
     """
-    Sends an email. Returns True if sent successfully, False otherwise.
-    Never raises — logs the error and returns False, so a failed email
-    doesn't crash the whole request (e.g. OTP generation should still
-    succeed and be returned/logged even if the email bounces).
+    Sends an email via Brevo's HTTP API. Returns True if sent
+    successfully, False otherwise. Never raises — logs the error and
+    returns False, so a failed email doesn't crash the whole request.
     """
-    if not EMAIL_ADDRESS or not EMAIL_APP_PASSWORD:
-        print("[EMAIL] Skipped — EMAIL_ADDRESS or EMAIL_APP_PASSWORD not set in .env")
+    if not BREVO_API_KEY or not BREVO_SENDER_EMAIL:
+        print("[EMAIL] Skipped — BREVO_API_KEY or BREVO_SENDER_EMAIL not set in .env")
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = to_email
-    msg.attach(MIMEText(body_html, "html"))
+    payload = {
+        "sender": {"email": BREVO_SENDER_EMAIL, "name": "Placify"},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": body_html,
+    }
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_ADDRESS, EMAIL_APP_PASSWORD)
-            server.sendmail(EMAIL_ADDRESS, to_email, msg.as_string())
-        print(f"[EMAIL] Sent to {to_email}: {subject}")
-        return True
+        response = requests.post(BREVO_API_URL, json=payload, headers=headers, timeout=10)
+        if response.status_code in (200, 201):
+            print(f"[EMAIL] Sent to {to_email}: {subject}")
+            return True
+        else:
+            print(f"[EMAIL] Failed to send to {to_email}: {response.status_code} {response.text}")
+            return False
     except Exception as e:
         print(f"[EMAIL] Failed to send to {to_email}: {e}")
         return False
 
 
 def send_otp_email(to_email: str, otp_code: str) -> bool:
-    subject = "Your CampusBridge Verification Code"
+    subject = "Your Placify Verification Code"
     body_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
-        <h2 style="color: #1D3E82;">CampusBridge</h2>
+        <h2 style="color: #1D3E82;">Placify</h2>
         <p>Your verification code is:</p>
         <div style="font-size: 28px; font-weight: bold; letter-spacing: 4px;
                     background: #F5F6F8; padding: 16px; text-align: center;
@@ -82,10 +86,10 @@ def send_otp_email(to_email: str, otp_code: str) -> bool:
 
 
 def send_reset_password_email(to_email: str, reset_link: str) -> bool:
-    subject = "Reset Your CampusBridge Password"
+    subject = "Reset Your Placify Password"
     body_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
-        <h2 style="color: #1D3E82;">CampusBridge</h2>
+        <h2 style="color: #1D3E82;">Placify</h2>
         <p>We received a request to reset your password. Click below to continue:</p>
         <a href="{reset_link}"
            style="display: inline-block; background: #D98E04; color: white;
