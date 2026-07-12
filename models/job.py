@@ -142,3 +142,74 @@ def count_jobs_by_status(status: str) -> int:
         return count
     finally:
         conn.close()
+
+
+# ================= Student-facing (browse/detail) =================
+# Only shows jobs with status='Approved' — students should never see
+# Pending/Rejected/Closed postings.
+
+def list_approved_jobs(search="", job_type="", location="", page=1, per_page=10):
+    """Returns (list_of_job_dicts, total_count) — for the Browse Jobs page."""
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        where_clauses = ["j.status = 'Approved'"]
+        params = []
+
+        if search:
+            where_clauses.append("(j.title LIKE %s OR c.company_name LIKE %s)")
+            like = f"%{search}%"
+            params.extend([like, like])
+
+        if job_type:
+            where_clauses.append("j.job_type = %s")
+            params.append(job_type)
+
+        if location:
+            where_clauses.append("j.location LIKE %s")
+            params.append(f"%{location}%")
+
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        cursor.execute(
+            f"SELECT COUNT(*) as cnt FROM jobs j JOIN clients c ON j.client_id = c.id {where_sql}",
+            params
+        )
+        total = cursor.fetchone()["cnt"]
+
+        cursor.execute(
+            f"""SELECT j.id, j.title, j.job_type, j.location, j.salary_stipend,
+                       j.last_date_to_apply, j.created_at, c.company_name
+                FROM jobs j
+                JOIN clients c ON j.client_id = c.id
+                {where_sql}
+                ORDER BY j.created_at DESC LIMIT %s OFFSET %s""",
+            params + [per_page, offset]
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows, total
+    finally:
+        conn.close()
+
+
+def get_approved_job_by_id(job_id: int):
+    """Returns None if the job doesn't exist OR isn't Approved — students
+    should get a 404 either way, not be able to tell the difference."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT j.*, c.company_name, c.industry as company_industry,
+                      c.website as company_website
+               FROM jobs j
+               JOIN clients c ON j.client_id = c.id
+               WHERE j.id = %s AND j.status = 'Approved'""",
+            (job_id,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return row
+    finally:
+        conn.close()

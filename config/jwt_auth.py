@@ -38,6 +38,18 @@ TOKEN_EXPIRY_HOURS = 24
 def generate_admin_token(admin_id: int, email: str) -> str:
     payload = {
         "admin_id": admin_id,
+        "role": "admin",
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS),
+        "iat": datetime.datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def generate_student_token(student_id: int, email: str) -> str:
+    payload = {
+        "student_id": student_id,
+        "role": "student",
         "email": email,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS),
         "iat": datetime.datetime.utcnow(),
@@ -60,8 +72,7 @@ def admin_required(f):
     """
     Decorator — put this on any route that should only be callable by
     a logged-in admin. Reads the Authorization: Bearer <token> header,
-    verifies it, and injects the verified admin_id as the route
-    function's first argument (before any URL params like student_id).
+    verifies it, and injects the verified admin_id as request.admin_id.
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -79,9 +90,45 @@ def admin_required(f):
         if error:
             return jsonify({"success": False, "message": error}), 401
 
-        # Make the verified admin_id available to the route function
+        if payload.get("role") != "admin":
+            return jsonify({"success": False, "message": "This token is not valid for admin routes."}), 401
+
         request.admin_id = payload["admin_id"]
         request.admin_email = payload["email"]
+
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def student_required(f):
+    """
+    Same pattern as admin_required, but for Student routes. Injects the
+    verified student_id as request.student_id — so a student can only
+    ever access/edit THEIR OWN data, never another student's, since the
+    id comes from the signed token, not from anything the client can
+    tamper with.
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+
+        if not auth_header.startswith("Bearer "):
+            return jsonify({
+                "success": False,
+                "message": "Missing or malformed Authorization header. Expected: Bearer <token>"
+            }), 401
+
+        token = auth_header.split("Bearer ", 1)[1].strip()
+        payload, error = verify_admin_token(token)
+
+        if error:
+            return jsonify({"success": False, "message": error}), 401
+
+        if payload.get("role") != "student":
+            return jsonify({"success": False, "message": "This token is not valid for student routes."}), 401
+
+        request.student_id = payload["student_id"]
+        request.student_email = payload["email"]
 
         return f(*args, **kwargs)
     return wrapper

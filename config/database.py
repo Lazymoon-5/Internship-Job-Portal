@@ -173,6 +173,7 @@ def init_db():
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id INT NOT NULL,
                 job_id INT NOT NULL,
+                resume_id INT DEFAULT NULL,
                 cover_letter TEXT,
                 portfolio_link VARCHAR(255),
                 status ENUM('Applied','In Review','Shortlisted','Interview','Offered','Rejected') DEFAULT 'Applied',
@@ -195,9 +196,77 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS resumes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id INT NOT NULL,
+                filename VARCHAR(255) NOT NULL,
+                file_url VARCHAR(500) NOT NULL,
+                is_primary BOOLEAN DEFAULT FALSE,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS certifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id INT NOT NULL,
+                certificate_name VARCHAR(200) NOT NULL,
+                issued_by VARCHAR(200),
+                file_url VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skills (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id INT NOT NULL,
+                skill_name VARCHAR(100) NOT NULL,
+                level VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
 
         conn.commit()
         cursor.close()
+
+        # ---- Safe ALTER TABLE for new student profile columns ----
+        # Wrapped individually so this works whether run against a
+        # brand-new database (columns won't exist, ALTER succeeds) or
+        # an existing one from before this update (ALTER may fail with
+        # "duplicate column" — caught and ignored, since that just means
+        # it was already added in a previous run).
+        profile_columns = [
+            ("department", "VARCHAR(150)"),
+            ("current_year", "VARCHAR(50)"),
+            ("mobile_no", "VARCHAR(20)"),
+            ("profile_summary", "TEXT"),
+            ("city", "VARCHAR(100)"),
+            ("pincode", "VARCHAR(20)"),
+            ("state", "VARCHAR(100)"),
+            ("linkedin_url", "VARCHAR(255)"),
+            ("enrollment_no", "VARCHAR(100)"),
+            ("college_address", "TEXT"),
+            ("course", "VARCHAR(150)"),
+            ("gpa_cgpa", "VARCHAR(20)"),
+            ("profile_photo_url", "VARCHAR(500)"),
+            ("profile_completed", "BOOLEAN DEFAULT FALSE"),
+        ]
+        conn2 = get_db_connection()
+        try:
+            cursor2 = conn2.cursor()
+            for col_name, col_type in profile_columns:
+                try:
+                    cursor2.execute(f"ALTER TABLE students ADD COLUMN {col_name} {col_type}")
+                    conn2.commit()
+                except Exception:
+                    conn2.rollback()  # column already exists — fine, skip it
+            cursor2.close()
+        finally:
+            conn2.close()
+
         print("[DB] Connected and tables verified.")
     finally:
         conn.close()

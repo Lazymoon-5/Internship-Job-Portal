@@ -168,3 +168,138 @@ def monthly_application_counts(months_back: int = 6):
         return rows
     finally:
         conn.close()
+
+
+# ================= Student-facing (apply/my applications) =================
+
+def create_application_with_check(student_id: int, job_id: int, cover_letter: str,
+                                     portfolio_link: str, resume_id):
+    """
+    Returns (application_id, error_message). error_message is None on
+    success. Checks the job exists+is Approved and the student hasn't
+    already applied, before inserting — clean errors instead of relying
+    on the DB's UNIQUE constraint to fail loudly.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT id, status FROM jobs WHERE id = %s", (job_id,))
+        job = cursor.fetchone()
+        if not job:
+            cursor.close()
+            return None, "Job not found."
+        if job["status"] != "Approved":
+            cursor.close()
+            return None, "This job is not currently accepting applications."
+
+        cursor.execute(
+            "SELECT id FROM applications WHERE student_id = %s AND job_id = %s",
+            (student_id, job_id)
+        )
+        if cursor.fetchone():
+            cursor.close()
+            return None, "You have already applied to this job."
+
+        cursor2 = conn.cursor()
+        cursor2.execute(
+            """INSERT INTO applications (student_id, job_id, resume_id, cover_letter, portfolio_link)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (student_id, job_id, resume_id, cover_letter, portfolio_link)
+        )
+        conn.commit()
+        new_id = cursor2.lastrowid
+        cursor2.close()
+        cursor.close()
+        return new_id, None
+    finally:
+        conn.close()
+
+
+def list_applications_by_student(student_id: int, page=1, per_page=20):
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT COUNT(*) as cnt FROM applications WHERE student_id = %s",
+            (student_id,)
+        )
+        total = cursor.fetchone()["cnt"]
+
+        cursor.execute(
+            """SELECT a.id, a.status, a.applied_at, a.updated_at,
+                      j.id as job_id, j.title as job_title, j.location, j.job_type,
+                      c.company_name
+               FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               JOIN clients c ON j.client_id = c.id
+               WHERE a.student_id = %s
+               ORDER BY a.applied_at DESC LIMIT %s OFFSET %s""",
+            (student_id, per_page, offset)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows, total
+    finally:
+        conn.close()
+
+
+def get_student_application_stats(student_id: int):
+    """For the Applied Status page's 4 stat cards."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM applications WHERE student_id = %s", (student_id,))
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            """SELECT COUNT(*) FROM applications
+               WHERE student_id = %s AND status IN ('Applied','In Review','Shortlisted','Interview')""",
+            (student_id,)
+        )
+        active = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM applications WHERE student_id = %s AND status = 'Offered'",
+            (student_id,)
+        )
+        offers = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM applications WHERE student_id = %s AND status = 'Rejected'",
+            (student_id,)
+        )
+        rejected = cursor.fetchone()[0]
+
+        cursor.close()
+        return {
+            "total_applied": total,
+            "active_progress": active,
+            "offers_received": offers,
+            "rejected": rejected,
+        }
+    finally:
+        conn.close()
+
+
+def get_student_application_detail(application_id: int, student_id: int):
+    """student_id required — a student can only view THEIR OWN application detail."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT a.*, j.title as job_title, j.job_type, j.location,
+                      c.company_name
+               FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               JOIN clients c ON j.client_id = c.id
+               WHERE a.id = %s AND a.student_id = %s""",
+            (application_id, student_id)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return row
+    finally:
+        conn.close()

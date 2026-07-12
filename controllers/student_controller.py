@@ -165,10 +165,14 @@ def login_student(data):
             "message": "Your account has been blocked by an administrator. Contact support for help."
         }, 403
 
+    from config.jwt_auth import generate_student_token
+    token = generate_student_token(student.id, student.email)
+
     return {
         "success": True,
         "message": "Login successful.",
-        "student": student.to_dict()
+        "student": student.to_dict(),
+        "token": token
     }, 200
 
 
@@ -204,10 +208,14 @@ def google_login(data):
         name=payload.get("name", payload["email"].split("@")[0]),
     )
 
+    from config.jwt_auth import generate_student_token
+    token = generate_student_token(student.id, student.email)
+
     return {
         "success": True,
         "message": "Login successful via Google.",
-        "student": student.to_dict()
+        "student": student.to_dict(),
+        "token": token
     }, 200
 
 
