@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models.client import (
     add_client,
     find_by_email,
+    find_by_id,
     update_password,
     mark_verified,
     create_reset_token,
@@ -160,10 +161,14 @@ def login_client(data):
             "message": "Your company account has been blocked by an administrator. Contact support for help."
         }, 403
 
+    from config.jwt_auth import generate_client_token
+    token = generate_client_token(client.id, client.email)
+
     return {
         "success": True,
         "message": "Login successful.",
-        "client": client.to_dict()
+        "client": client.to_dict(),
+        "token": token
     }, 200
 
 
@@ -243,3 +248,37 @@ def reset_password(data):
         "success": True,
         "message": "Password has been reset successfully. You can now log in with your new password."
     }, 200
+
+
+def change_password(client_id, data):
+    """Requires the client to be logged in (client_id from verified JWT)."""
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+
+    if not current_password or not new_password or not confirm_password:
+        return {
+            "success": False,
+            "message": "Current password, new password, and confirm password are all required."
+        }, 400
+
+    client = find_by_id(client_id)
+    if not client:
+        return {"success": False, "message": "Company account not found."}, 404
+
+    if not check_password_hash(client.password_hash, current_password):
+        return {"success": False, "message": "Current password is incorrect."}, 401
+
+    if new_password != confirm_password:
+        return {"success": False, "message": "New passwords do not match."}, 400
+
+    if len(new_password) < 8:
+        return {
+            "success": False,
+            "message": "New password must be at least 8 characters long."
+        }, 400
+
+    new_hash = generate_password_hash(new_password)
+    update_password(client.email, new_hash)
+
+    return {"success": True, "message": "Password updated successfully."}, 200

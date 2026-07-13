@@ -6,7 +6,9 @@ from controllers.client_controller import (
     reset_password,
     verify_registration_otp,
     resend_otp,
+    change_password,
 )
+from config.jwt_auth import client_required
 
 client_bp = Blueprint("client_routes", __name__, url_prefix="/api/client")
 
@@ -50,4 +52,12 @@ def forgot_password_route():
 def reset_password_route():
     data = request.get_json(silent=True) or {}
     response, status_code = reset_password(data)
+    return jsonify(response), status_code
+
+
+@client_bp.route("/change-password", methods=["POST"])
+@client_required
+def change_password_route():
+    data = request.get_json(silent=True) or {}
+    response, status_code = change_password(request.client_id, data)
     return jsonify(response), status_code

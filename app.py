@@ -18,6 +18,10 @@ from routes.student_profile_routes import student_profile_bp
 from routes.student_resume_routes import student_resume_bp
 from routes.student_jobs_routes import student_jobs_bp
 from routes.student_applications_routes import student_applications_bp
+from routes.client_dashboard_routes import client_dashboard_bp
+from routes.client_profile_routes import client_profile_bp
+from routes.client_jobs_routes import client_jobs_bp
+from routes.client_applicants_routes import client_applicants_bp
 
 
 def create_app():
@@ -62,6 +66,10 @@ def create_app():
     app.register_blueprint(student_resume_bp)
     app.register_blueprint(student_jobs_bp)
     app.register_blueprint(student_applications_bp)
+    app.register_blueprint(client_dashboard_bp)
+    app.register_blueprint(client_profile_bp)
+    app.register_blueprint(client_jobs_bp)
+    app.register_blueprint(client_applicants_bp)
 
     @app.route("/")
     def health_check():

@@ -23,11 +23,12 @@ def create_job(job_data: dict):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO jobs (client_id, title, description, job_type, required_skills,
-               eligibility_criteria, location, salary_stipend, last_date_to_apply)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            """INSERT INTO jobs (client_id, title, description, job_type, department,
+               required_skills, eligibility_criteria, location, salary_stipend, last_date_to_apply)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (job_data["client_id"], job_data["title"], job_data.get("description", ""),
-             job_data.get("job_type", "Internship"), job_data.get("required_skills", ""),
+             job_data.get("job_type", "Internship"), job_data.get("department", ""),
+             job_data.get("required_skills", ""),
              job_data.get("eligibility_criteria", ""), job_data.get("location", ""),
              job_data.get("salary_stipend", ""), job_data.get("last_date_to_apply"))
         )
@@ -179,7 +180,7 @@ def list_approved_jobs(search="", job_type="", location="", page=1, per_page=10)
         total = cursor.fetchone()["cnt"]
 
         cursor.execute(
-            f"""SELECT j.id, j.title, j.job_type, j.location, j.salary_stipend,
+            f"""SELECT j.id, j.title, j.job_type, j.department, j.location, j.salary_stipend,
                        j.last_date_to_apply, j.created_at, c.company_name
                 FROM jobs j
                 JOIN clients c ON j.client_id = c.id
@@ -211,5 +212,218 @@ def get_approved_job_by_id(job_id: int):
         row = cursor.fetchone()
         cursor.close()
         return row
+    finally:
+        conn.close()
+
+
+# ================= Client-facing (Post a Job, Jobs Posted, Dashboard) =================
+
+def list_jobs_by_client(client_id: int, search="", status_filter="", page=1, per_page=10):
+    """Returns (list_of_job_dicts, total_count) — for the Jobs Posted page."""
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        where_clauses = ["j.client_id = %s"]
+        params = [client_id]
+
+        if search:
+            where_clauses.append("j.title LIKE %s")
+            params.append(f"%{search}%")
+
+        if status_filter:
+            where_clauses.append("j.status = %s")
+            params.append(status_filter)
+
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        cursor.execute(f"SELECT COUNT(*) as cnt FROM jobs j {where_sql}", params)
+        total = cursor.fetchone()["cnt"]
+
+        cursor.execute(
+            f"""SELECT j.*,
+                       (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count
+                FROM jobs j
+                {where_sql}
+                ORDER BY j.created_at DESC LIMIT %s OFFSET %s""",
+            params + [per_page, offset]
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows, total
+    finally:
+        conn.close()
+
+
+def get_job_owned_by_client(job_id: int, client_id: int):
+    """Returns the job only if it belongs to this client — else None.
+    Used to enforce that a company can only edit/close/view its OWN jobs."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT * FROM jobs WHERE id = %s AND client_id = %s",
+            (job_id, client_id)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return row
+    finally:
+        conn.close()
+
+
+def update_job(job_id: int, client_id: int, data: dict) -> bool:
+    """Only updates if the job belongs to this client."""
+    updatable_fields = [
+        "title", "description", "job_type", "department", "required_skills",
+        "eligibility_criteria", "location", "salary_stipend", "last_date_to_apply"
+    ]
+    set_clauses = []
+    values = []
+
+    for field in updatable_fields:
+        if field in data:
+            set_clauses.append(f"{field} = %s")
+            values.append(data[field])
+
+    if not set_clauses:
+        return False
+
+    values.extend([job_id, client_id])
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE jobs SET {', '.join(set_clauses)} WHERE id = %s AND client_id = %s",
+            values
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        return updated
+    finally:
+        conn.close()
+
+
+def update_job_status_by_client(job_id: int, client_id: int, status: str) -> bool:
+    """status: 'Draft', 'Pending', 'Closed', or 'Filled' — Approved/Rejected
+    are Admin-only transitions (see update_job_status in the admin section above)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE jobs SET status = %s WHERE id = %s AND client_id = %s",
+            (status, job_id, client_id)
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        return updated
+    finally:
+        conn.close()
+
+
+def get_client_job_stats(client_id: int):
+    """For the Jobs Posted page's 4 stat cards."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM jobs WHERE client_id = %s", (client_id,))
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM jobs WHERE client_id = %s AND status = 'Approved'",
+            (client_id,)
+        )
+        active = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM jobs WHERE client_id = %s AND status = 'Filled'",
+            (client_id,)
+        )
+        filled = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM jobs WHERE client_id = %s AND status IN ('Closed','Draft')",
+            (client_id,)
+        )
+        closed_or_draft = cursor.fetchone()[0]
+
+        cursor.close()
+        return {
+            "total_listings": total,
+            "active_now": active,
+            "positions_filled": filled,
+            "closed_or_drafts": closed_or_draft,
+        }
+    finally:
+        conn.close()
+
+
+def get_client_dashboard_stats(client_id: int):
+    """For the Company Dashboard's 4 stat cards."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM jobs WHERE client_id = %s AND status = 'Approved'",
+            (client_id,)
+        )
+        active_posts = cursor.fetchone()[0]
+
+        cursor.execute(
+            """SELECT COUNT(*) FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               WHERE j.client_id = %s""",
+            (client_id,)
+        )
+        total_applicants = cursor.fetchone()[0]
+
+        cursor.execute(
+            """SELECT COUNT(*) FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               WHERE j.client_id = %s AND a.status = 'Shortlisted'""",
+            (client_id,)
+        )
+        shortlisted = cursor.fetchone()[0]
+
+        cursor.execute(
+            """SELECT COUNT(*) FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               WHERE j.client_id = %s AND a.status = 'Offered'""",
+            (client_id,)
+        )
+        offers_made = cursor.fetchone()[0]
+
+        cursor.close()
+        return {
+            "active_job_posts": active_posts,
+            "total_applicants": total_applicants,
+            "shortlisted": shortlisted,
+            "offers_made": offers_made,
+        }
+    finally:
+        conn.close()
+
+
+def get_active_jobs_for_client(client_id: int, limit=5):
+    """For the Dashboard's 'Active Jobs' panel."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT j.id, j.title, j.status, j.last_date_to_apply,
+                      (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count
+               FROM jobs j
+               WHERE j.client_id = %s AND j.status IN ('Approved','Pending')
+               ORDER BY j.created_at DESC LIMIT %s""",
+            (client_id, limit)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
     finally:
         conn.close()

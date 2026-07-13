@@ -158,12 +158,13 @@ def init_db():
                 title VARCHAR(200) NOT NULL,
                 description TEXT,
                 job_type ENUM('Internship','Full-Time') DEFAULT 'Internship',
+                department VARCHAR(150),
                 required_skills TEXT,
                 eligibility_criteria TEXT,
                 location VARCHAR(150),
                 salary_stipend VARCHAR(100),
                 last_date_to_apply DATE,
-                status ENUM('Pending','Approved','Rejected','Closed') DEFAULT 'Pending',
+                status ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -178,6 +179,7 @@ def init_db():
                 portfolio_link VARCHAR(255),
                 status ENUM('Applied','In Review','Shortlisted','Interview','Offered','Rejected') DEFAULT 'Applied',
                 admin_notes TEXT,
+                viewed_by_company BOOLEAN DEFAULT FALSE,
                 applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
@@ -266,6 +268,89 @@ def init_db():
             cursor2.close()
         finally:
             conn2.close()
+
+        # ---- Safe ALTER TABLE for new client (company) profile columns ----
+        client_profile_columns = [
+            ("contact", "VARCHAR(50)"),
+            ("company_size", "VARCHAR(50)"),
+            ("year_established", "VARCHAR(10)"),
+            ("city", "VARCHAR(100)"),
+            ("pincode", "VARCHAR(20)"),
+            ("state", "VARCHAR(100)"),
+            ("address", "TEXT"),
+            ("about_company", "TEXT"),
+            ("company_summary", "TEXT"),
+            ("hr_name", "VARCHAR(150)"),
+            ("hr_contact_email", "VARCHAR(150)"),
+            ("hr_phone_number", "VARCHAR(50)"),
+            ("facebook_url", "VARCHAR(255)"),
+            ("linkedin_url", "VARCHAR(255)"),
+            ("hiring_locations", "VARCHAR(500)"),
+            ("preferred_job_types", "VARCHAR(255)"),
+            ("company_registration_number", "VARCHAR(100)"),
+            ("cin_number", "VARCHAR(100)"),
+            ("gst_number", "VARCHAR(100)"),
+            ("pan_number", "VARCHAR(100)"),
+            ("terms_accepted", "BOOLEAN DEFAULT FALSE"),
+            ("profile_completed", "BOOLEAN DEFAULT FALSE"),
+        ]
+        conn3 = get_db_connection()
+        try:
+            cursor3 = conn3.cursor()
+            for col_name, col_type in client_profile_columns:
+                try:
+                    cursor3.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
+                    conn3.commit()
+                except Exception:
+                    conn3.rollback()
+            cursor3.close()
+        finally:
+            conn3.close()
+
+        # ---- viewed_by_company on applications (existing tables won't
+        # get this from CREATE TABLE IF NOT EXISTS) ----
+        conn4 = get_db_connection()
+        try:
+            cursor4 = conn4.cursor()
+            try:
+                cursor4.execute("ALTER TABLE applications ADD COLUMN viewed_by_company BOOLEAN DEFAULT FALSE")
+                conn4.commit()
+            except Exception:
+                conn4.rollback()
+            cursor4.close()
+        finally:
+            conn4.close()
+
+        # ---- Expand jobs.status enum to include Draft/Filled (existing
+        # tables keep their old enum definition otherwise) ----
+        conn5 = get_db_connection()
+        try:
+            cursor5 = conn5.cursor()
+            try:
+                cursor5.execute(
+                    "ALTER TABLE jobs MODIFY COLUMN status "
+                    "ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft'"
+                )
+                conn5.commit()
+            except Exception:
+                conn5.rollback()
+            cursor5.close()
+        finally:
+            conn5.close()
+
+        # ---- department column on jobs (existing tables won't get
+        # this from CREATE TABLE IF NOT EXISTS) ----
+        conn6 = get_db_connection()
+        try:
+            cursor6 = conn6.cursor()
+            try:
+                cursor6.execute("ALTER TABLE jobs ADD COLUMN department VARCHAR(150)")
+                conn6.commit()
+            except Exception:
+                conn6.rollback()
+            cursor6.close()
+        finally:
+            conn6.close()
 
         print("[DB] Connected and tables verified.")
     finally:
