@@ -57,6 +57,17 @@ def generate_student_token(student_id: int, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def generate_client_token(client_id: int, email: str) -> str:
+    payload = {
+        "client_id": client_id,
+        "role": "client",
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS),
+        "iat": datetime.datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 def verify_admin_token(token: str):
     """Returns (payload, error_message). payload contains admin_id, email."""
     try:
@@ -129,6 +140,38 @@ def student_required(f):
 
         request.student_id = payload["student_id"]
         request.student_email = payload["email"]
+
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def client_required(f):
+    """
+    Same pattern, for Client (Company) routes. Injects the verified
+    client_id as request.client_id — a company can only ever access/edit
+    THEIR OWN jobs and applicants, never another company's.
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+
+        if not auth_header.startswith("Bearer "):
+            return jsonify({
+                "success": False,
+                "message": "Missing or malformed Authorization header. Expected: Bearer <token>"
+            }), 401
+
+        token = auth_header.split("Bearer ", 1)[1].strip()
+        payload, error = verify_admin_token(token)
+
+        if error:
+            return jsonify({"success": False, "message": error}), 401
+
+        if payload.get("role") != "client":
+            return jsonify({"success": False, "message": "This token is not valid for client routes."}), 401
+
+        request.client_id = payload["client_id"]
+        request.client_email = payload["email"]
 
         return f(*args, **kwargs)
     return wrapper

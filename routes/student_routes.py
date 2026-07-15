@@ -7,7 +7,9 @@ from controllers.student_controller import (
     verify_registration_otp,
     resend_otp,
     google_login,
+    change_password,
 )
+from config.jwt_auth import student_required
 
 student_bp = Blueprint("student_routes", __name__, url_prefix="/api/student")
 
@@ -58,4 +60,12 @@ def forgot_password_route():
 def reset_password_route():
     data = request.get_json(silent=True) or {}
     response, status_code = reset_password(data)
+    return jsonify(response), status_code
+
+
+@student_bp.route("/change-password", methods=["POST"])
+@student_required
+def change_password_route():
+    data = request.get_json(silent=True) or {}
+    response, status_code = change_password(request.student_id, data)
     return jsonify(response), status_code

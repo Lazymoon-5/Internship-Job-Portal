@@ -104,3 +104,24 @@ def send_reset_password_email(to_email: str, reset_link: str) -> bool:
     </div>
     """
     return send_email(to_email, subject, body_html)
+
+
+def send_recruiter_message_email(to_email: str, company_name: str, subject: str, message: str) -> bool:
+    """Used by 'Message All Applicants' — a free-text message from a
+    company to a candidate about a specific job application."""
+    full_subject = f"{company_name}: {subject}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p style="color: #6B7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+            Message from {company_name}
+        </p>
+        <div style="background: #F5F6F8; padding: 16px; border-radius: 8px; white-space: pre-wrap;">
+            {message}
+        </div>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            This message was sent via Placify regarding your job application.
+        </p>
+    </div>
+    """
+    return send_email(to_email, full_subject, body_html)

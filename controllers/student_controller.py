@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models.student import (
     add_student,
     find_by_email,
+    find_by_id,
     update_password,
     mark_verified,
     find_or_create_by_google,
@@ -293,3 +294,37 @@ def reset_password(data):
         "success": True,
         "message": "Password has been reset successfully. You can now log in with your new password."
     }, 200
+
+
+def change_password(student_id, data):
+    """Requires the student to be logged in (student_id from verified JWT)."""
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+
+    if not current_password or not new_password or not confirm_password:
+        return {
+            "success": False,
+            "message": "Current password, new password, and confirm password are all required."
+        }, 400
+
+    student = find_by_id(student_id)
+    if not student:
+        return {"success": False, "message": "Student not found."}, 404
+
+    if not check_password_hash(student.password_hash, current_password):
+        return {"success": False, "message": "Current password is incorrect."}, 401
+
+    if new_password != confirm_password:
+        return {"success": False, "message": "New passwords do not match."}, 400
+
+    if len(new_password) < 6:
+        return {
+            "success": False,
+            "message": "New password must be at least 6 characters long."
+        }, 400
+
+    new_hash = generate_password_hash(new_password)
+    update_password(student.email, new_hash)
+
+    return {"success": True, "message": "Password updated successfully."}, 200

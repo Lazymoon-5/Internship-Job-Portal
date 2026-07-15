@@ -303,3 +303,208 @@ def get_student_application_detail(application_id: int, student_id: int):
         return row
     finally:
         conn.close()
+
+
+# ================= Client-facing (Manage Applicants) =================
+
+def list_applications_for_job(job_id: int, client_id: int, search="", status_filter="",
+                                 page=1, per_page=10):
+    """
+    Returns (list_of_application_dicts, total_count) — for the Applicant
+    Management page. client_id required so a company can only ever see
+    applicants for jobs THEY posted, not another company's.
+    """
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+
+        # Ownership check first
+        cursor.execute("SELECT id FROM jobs WHERE id = %s AND client_id = %s", (job_id, client_id))
+        if not cursor.fetchone():
+            cursor.close()
+            return None, 0  # signals "not your job" to the controller
+
+        where_clauses = ["a.job_id = %s"]
+        params = [job_id]
+
+        if search:
+            where_clauses.append("s.name LIKE %s")
+            params.append(f"%{search}%")
+
+        if status_filter:
+            where_clauses.append("a.status = %s")
+            params.append(status_filter)
+
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        cursor.execute(
+            f"""SELECT COUNT(*) as cnt FROM applications a
+                JOIN students s ON a.student_id = s.id
+                {where_sql}""",
+            params
+        )
+        total = cursor.fetchone()["cnt"]
+
+        cursor.execute(
+            f"""SELECT a.id, a.status, a.applied_at, a.viewed_by_company,
+                       s.id as student_id, s.name as student_name, s.college, s.branch,
+                       s.current_year, s.gpa_cgpa, s.profile_summary
+                FROM applications a
+                JOIN students s ON a.student_id = s.id
+                {where_sql}
+                ORDER BY a.applied_at DESC LIMIT %s OFFSET %s""",
+            params + [per_page, offset]
+        )
+        rows = cursor.fetchall()
+
+        # Attach each applicant's skills (separate query per row, since
+        # skills live in their own table — acceptable at this page size,
+        # 10-20 rows per page).
+        for row in rows:
+            cursor2 = conn.cursor(dictionary=True)
+            cursor2.execute(
+                "SELECT skill_name FROM skills WHERE student_id = %s", (row["student_id"],)
+            )
+            row["skills"] = [s["skill_name"] for s in cursor2.fetchall()]
+            cursor2.close()
+
+        cursor.close()
+        return rows, total
+    finally:
+        conn.close()
+
+
+def get_job_applicant_stats(job_id: int, client_id: int):
+    """For the Applicant Management page's 4 stat cards."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM jobs WHERE id = %s AND client_id = %s", (job_id, client_id))
+        if not cursor.fetchone():
+            cursor.close()
+            return None
+
+        cursor.execute("SELECT COUNT(*) FROM applications WHERE job_id = %s", (job_id,))
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM applications WHERE job_id = %s AND viewed_by_company = FALSE",
+            (job_id,)
+        )
+        new_unseen = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM applications WHERE job_id = %s AND status = 'Shortlisted'",
+            (job_id,)
+        )
+        shortlisted = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM applications WHERE job_id = %s AND status = 'Rejected'",
+            (job_id,)
+        )
+        rejected = cursor.fetchone()[0]
+
+        cursor.close()
+        return {
+            "total_received": total,
+            "new_unseen": new_unseen,
+            "shortlisted": shortlisted,
+            "rejected": rejected,
+        }
+    finally:
+        conn.close()
+
+
+def get_applicant_profile_for_client(application_id: int, client_id: int):
+    """
+    Full Applicant Profile detail for the company to review — including
+    student academic info, skills, resume link. client_id required so a
+    company can only view applicants to THEIR OWN job postings.
+    Also marks the application as viewed (for the New/Unseen count).
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT a.*, j.title as job_title, j.client_id,
+                      s.id as student_id, s.name as student_name, s.email as student_email,
+                      s.college, s.branch, s.current_year, s.gpa_cgpa, s.profile_summary,
+                      s.linkedin_url, s.city, s.state
+               FROM applications a
+               JOIN jobs j ON a.job_id = j.id
+               JOIN students s ON a.student_id = s.id
+               WHERE a.id = %s AND j.client_id = %s""",
+            (application_id, client_id)
+        )
+        row = cursor.fetchone()
+
+        if row and not row["viewed_by_company"]:
+            cursor2 = conn.cursor()
+            cursor2.execute(
+                "UPDATE applications SET viewed_by_company = TRUE WHERE id = %s",
+                (application_id,)
+            )
+            conn.commit()
+            cursor2.close()
+            row["viewed_by_company"] = True  # reflect the update in the returned data too
+
+        if row:
+            cursor3 = conn.cursor(dictionary=True)
+            cursor3.execute(
+                "SELECT skill_name, level FROM skills WHERE student_id = %s", (row["student_id"],)
+            )
+            row["skills"] = cursor3.fetchall()
+            cursor3.close()
+
+        cursor.close()
+        return row
+    finally:
+        conn.close()
+
+
+def update_application_status_by_client(application_id: int, client_id: int, status: str) -> bool:
+    """status: 'Shortlisted' or 'Rejected' — client_id required for ownership check."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE applications a
+               JOIN jobs j ON a.job_id = j.id
+               SET a.status = %s
+               WHERE a.id = %s AND j.client_id = %s""",
+            (status, application_id, client_id)
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        return updated
+    finally:
+        conn.close()
+
+
+def get_applicant_emails_for_job(job_id: int, client_id: int):
+    """Returns list of {student_name, student_email} for every applicant
+    to this job — client_id required for ownership check."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM jobs WHERE id = %s AND client_id = %s", (job_id, client_id))
+        if not cursor.fetchone():
+            cursor.close()
+            return None  # not this client's job
+
+        cursor.execute(
+            """SELECT s.name as student_name, s.email as student_email
+               FROM applications a
+               JOIN students s ON a.student_id = s.id
+               WHERE a.job_id = %s""",
+            (job_id,)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
+    finally:
+        conn.close()
