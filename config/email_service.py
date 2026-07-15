@@ -1,21 +1,22 @@
 """
-Email sending module — using Resend's HTTP API (not SMTP).
+Email sending module — using SendGrid's HTTP API (not SMTP).
 
 Why HTTP instead of SMTP: many free-tier hosts (including Render on
 lower plans) block outbound SMTP ports (587/465) to prevent spam abuse.
-Resend's API works over regular HTTPS, which is never blocked, so this
-works reliably in production as well as locally.
+SendGrid's API works over regular HTTPS, which is never blocked, so
+this works reliably in production as well as locally.
 
 Reads credentials from environment variables (.env):
-    RESEND_API_KEY      — from Resend dashboard -> API Keys
-    RESEND_SENDER_EMAIL  — a verified sender email/domain in your Resend account
+    SENDGRID_API_KEY      — from SendGrid dashboard -> Settings -> API Keys
+    SENDGRID_SENDER_EMAIL  — a verified sender email in your SendGrid account
 
 SETUP:
-1. Sign up free at resend.com
-2. Dashboard -> API Keys -> Create API Key -> copy it (starts with "re_")
-3. Dashboard -> Domains -> add + verify a sender (or use their provided
-   test domain like "onboarding@resend.dev" while testing, which works
-   immediately with no verification needed)
+1. Sign up free at sendgrid.com (free tier: 100 emails/day forever)
+2. Settings -> API Keys -> Create API Key -> Full Access (or "Restricted
+   Access" with at least "Mail Send" permission) -> copy it (starts with "SG.")
+3. Settings -> Sender Authentication -> verify a Single Sender (fastest —
+   just verifies one email address, no domain needed) OR authenticate a
+   whole domain for better deliverability
 4. Put both values in .env (and in Render's Environment tab once deployed)
 """
 
@@ -28,35 +29,36 @@ try:
 except ImportError:
     pass
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
-RESEND_SENDER_EMAIL = os.environ.get("RESEND_SENDER_EMAIL", "onboarding@resend.dev")
-RESEND_API_URL = "https://api.resend.com/emails"
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+SENDGRID_SENDER_EMAIL = os.environ.get("SENDGRID_SENDER_EMAIL")
+SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
 
 
 def send_email(to_email: str, subject: str, body_html: str) -> bool:
     """
-    Sends an email via Resend's HTTP API. Returns True if sent
+    Sends an email via SendGrid's HTTP API. Returns True if sent
     successfully, False otherwise. Never raises — logs the error and
     returns False, so a failed email doesn't crash the whole request.
     """
-    if not RESEND_API_KEY:
-        print("[EMAIL] Skipped — RESEND_API_KEY not set in .env")
+    if not SENDGRID_API_KEY or not SENDGRID_SENDER_EMAIL:
+        print("[EMAIL] Skipped — SENDGRID_API_KEY or SENDGRID_SENDER_EMAIL not set in .env")
         return False
 
     payload = {
-        "from": f"Placify <{RESEND_SENDER_EMAIL}>",
-        "to": [to_email],
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": SENDGRID_SENDER_EMAIL, "name": "Placify"},
         "subject": subject,
-        "html": body_html,
+        "content": [{"type": "text/html", "value": body_html}],
     }
     headers = {
-        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",
         "Content-Type": "application/json",
     }
 
     try:
-        response = requests.post(RESEND_API_URL, json=payload, headers=headers, timeout=10)
-        if response.status_code in (200, 201):
+        response = requests.post(SENDGRID_API_URL, json=payload, headers=headers, timeout=10)
+        # SendGrid returns 202 Accepted on success — no response body
+        if response.status_code == 202:
             print(f"[EMAIL] Sent to {to_email}: {subject}")
             return True
         else:
