@@ -483,3 +483,29 @@ def update_application_status_by_client(application_id: int, client_id: int, sta
         return updated
     finally:
         conn.close()
+
+
+
+def get_applicant_emails_for_job(job_id: int, client_id: int):
+    """Returns list of {student_name, student_email} for every applicant
+    to this job — client_id required for ownership check."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM jobs WHERE id = %s AND client_id = %s", (job_id, client_id))
+        if not cursor.fetchone():
+            cursor.close()
+            return None  # not this client's job
+
+        cursor.execute(
+            """SELECT s.name as student_name, s.email as student_email
+               FROM applications a
+               JOIN students s ON a.student_id = s.id
+               WHERE a.job_id = %s""",
+            (job_id,)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
+    finally:
+        conn.close()

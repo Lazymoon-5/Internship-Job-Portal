@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from controllers.client_applicant_controller import (
     get_applicants, get_applicant_stats, get_applicant_profile,
-    shortlist_applicant, reject_applicant, schedule_interview, extend_offer
+    shortlist_applicant, reject_applicant, schedule_interview, extend_offer,
+    message_all_applicants
 )
 from config.jwt_auth import client_required
 
@@ -55,3 +56,12 @@ def schedule_interview_route(application_id):
 def extend_offer_route(application_id):
     response, status_code = extend_offer(request.client_id, application_id)
     return jsonify(response), status_code
+
+
+@client_applicants_bp.route("/jobs/<int:job_id>/message-applicants", methods=["POST"])
+@client_required
+def message_all_applicants_route(job_id):
+    data = request.get_json(silent=True) or {}
+    response, status_code = message_all_applicants(request.client_id, job_id, data)
+    return jsonify(response), status_code
+
