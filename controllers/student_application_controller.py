@@ -1,5 +1,8 @@
 import models.application as application_model
 import models.resume as resume_model
+import models.job as job_model
+import models.student as student_model
+import models.notification as notification_model
 
 
 def apply_to_job(student_id, job_id, data):
@@ -25,6 +28,21 @@ def apply_to_job(student_id, job_id, data):
     if error:
         status_code = 409 if "already applied" in error else 400
         return {"success": False, "message": error}, status_code
+
+    # Notify the company that owns this job — best-effort, never blocks
+    # the application itself if something about the notification fails.
+    try:
+        job = job_model.get_job_by_id(job_id)
+        student = student_model.find_by_id(student_id)
+        if job and student:
+            notification_model.create_notification(
+                user_type="client",
+                user_id=job["client_id"],
+                title="New Application Received",
+                message=f"{student.name} applied for {job['title']}.",
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to create application notification: {e}")
 
     return {"success": True, "message": "Application submitted successfully.", "id": new_id}, 201
 

@@ -508,3 +508,25 @@ def get_applicant_emails_for_job(job_id: int, client_id: int):
         return rows
     finally:
         conn.close()
+
+
+def get_student_and_job_for_application(application_id: int):
+    """Lightweight lookup — just student_id, student_name, and job_title,
+    for use in notification messages after a status change. Assumes
+    ownership has already been validated by the caller."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """SELECT a.student_id, s.name as student_name, j.title as job_title
+               FROM applications a
+               JOIN students s ON a.student_id = s.id
+               JOIN jobs j ON a.job_id = j.id
+               WHERE a.id = %s""",
+            (application_id,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return row
+    finally:
+        conn.close()

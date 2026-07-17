@@ -89,6 +89,21 @@ def verify_registration_otp(data):
 
     mark_verified(email)
 
+    # Notify all admins — best-effort, never blocks verification itself
+    try:
+        from models.admin import list_all_admin_ids
+        from models.notification import create_notification
+        client = find_by_email(email)
+        company_name = client.company_name if client else email
+        for admin_id in list_all_admin_ids():
+            create_notification(
+                user_type="admin", user_id=admin_id,
+                title="New Company Verified",
+                message=f"{company_name} ({email}) has verified their account and is awaiting approval.",
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to notify admins of company verification: {e}")
+
     return {
         "success": True,
         "message": "Email verified successfully. You can now log in."

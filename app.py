@@ -24,6 +24,8 @@ from routes.client_jobs_routes import client_jobs_bp
 from routes.client_applicants_routes import client_applicants_bp
 from routes.public_jobs_routes import public_jobs_bp
 from routes.contact_routes import contact_bp
+from routes.client_notifications_routes import client_notifications_bp
+from routes.student_notifications_routes import student_notifications_bp
 
 
 def create_app():
@@ -74,6 +76,8 @@ def create_app():
     app.register_blueprint(client_applicants_bp)
     app.register_blueprint(public_jobs_bp)
     app.register_blueprint(contact_bp)
+    app.register_blueprint(client_notifications_bp)
+    app.register_blueprint(student_notifications_bp)
 
     @app.route("/")
     def health_check():

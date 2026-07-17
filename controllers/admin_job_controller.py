@@ -6,6 +6,7 @@ Pending Review, Active Jobs, Total Applications).
 
 from config.database import is_db_available
 import models.job as job_model
+import models.notification as notification_model
 
 
 def get_jobs(args):
@@ -65,6 +66,17 @@ def approve_job(job_id):
         return {"success": False, "message": "Job post not found."}, 404
 
     job_model.update_job_status(job_id, "Approved")
+
+    try:
+        notification_model.create_notification(
+            user_type="client",
+            user_id=job["client_id"],
+            title="Job Post Approved",
+            message=f"Your job post \"{job['title']}\" has been approved and is now visible to students.",
+        )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to create job-approved notification: {e}")
+
     return {"success": True, "message": "Job post approved and now visible to students."}, 200
 
 
@@ -74,6 +86,17 @@ def reject_job(job_id):
         return {"success": False, "message": "Job post not found."}, 404
 
     job_model.update_job_status(job_id, "Rejected")
+
+    try:
+        notification_model.create_notification(
+            user_type="client",
+            user_id=job["client_id"],
+            title="Job Post Rejected",
+            message=f"Your job post \"{job['title']}\" was rejected by an administrator.",
+        )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to create job-rejected notification: {e}")
+
     return {"success": True, "message": "Job post rejected."}, 200
 
 

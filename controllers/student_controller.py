@@ -94,6 +94,21 @@ def verify_registration_otp(data):
 
     mark_verified(email)
 
+    # Notify all admins — best-effort, never blocks verification itself
+    try:
+        from models.admin import list_all_admin_ids
+        from models.notification import create_notification
+        student = find_by_email(email)
+        student_name = student.name if student else email
+        for admin_id in list_all_admin_ids():
+            create_notification(
+                user_type="admin", user_id=admin_id,
+                title="New Student Verified",
+                message=f"{student_name} ({email}) has verified their account.",
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to notify admins of student verification: {e}")
+
     return {
         "success": True,
         "message": "Email verified successfully. You can now log in."
