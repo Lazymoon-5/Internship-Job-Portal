@@ -64,4 +64,3 @@ def message_all_applicants_route(job_id):
     data = request.get_json(silent=True) or {}
     response, status_code = message_all_applicants(request.client_id, job_id, data)
     return jsonify(response), status_code
-

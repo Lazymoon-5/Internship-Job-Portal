@@ -127,3 +127,34 @@ def send_recruiter_message_email(to_email: str, company_name: str, subject: str,
     </div>
     """
     return send_email(to_email, full_subject, body_html)
+
+
+def send_contact_form_notification(submitter_name: str, submitter_email: str, message: str) -> bool:
+    """
+    Sends the Contact page submission to the TEAM's own inbox (not the
+    person who submitted it) — reads CONTACT_NOTIFICATION_EMAIL from
+    .env, falling back to SENDGRID_SENDER_EMAIL if not set separately.
+    """
+    import os
+    notification_email = os.environ.get("CONTACT_NOTIFICATION_EMAIL") or SENDGRID_SENDER_EMAIL
+
+    if not notification_email:
+        print("[EMAIL] Skipped contact notification — no CONTACT_NOTIFICATION_EMAIL or SENDGRID_SENDER_EMAIL set")
+        return False
+
+    subject = f"New Contact Form Submission from {submitter_name}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify — New Contact Submission</h2>
+        <p><strong>Name:</strong> {submitter_name}</p>
+        <p><strong>Email:</strong> {submitter_email}</p>
+        <p><strong>Message:</strong></p>
+        <div style="background: #F5F6F8; padding: 16px; border-radius: 8px; white-space: pre-wrap;">
+            {message}
+        </div>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            Reply directly to {submitter_email} to respond to this inquiry.
+        </p>
+    </div>
+    """
+    return send_email(notification_email, subject, body_html)

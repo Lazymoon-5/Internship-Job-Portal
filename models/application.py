@@ -485,7 +485,6 @@ def update_application_status_by_client(application_id: int, client_id: int, sta
         conn.close()
 
 
-
 def get_applicant_emails_for_job(job_id: int, client_id: int):
     """Returns list of {student_name, student_email} for every applicant
     to this job — client_id required for ownership check."""

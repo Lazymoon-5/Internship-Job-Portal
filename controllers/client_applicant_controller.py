@@ -1,8 +1,6 @@
 import models.application as application_model
-
 import models.client as client_model
 from config.email_service import send_recruiter_message_email
-
 
 
 def get_applicants(client_id, job_id, args):
@@ -67,7 +65,6 @@ def reject_applicant(client_id, application_id):
     if not updated:
         return {"success": False, "message": "Applicant not found."}, 404
     return {"success": True, "message": "Application rejected."}, 200
-
 
 
 def message_all_applicants(client_id, job_id, data):
