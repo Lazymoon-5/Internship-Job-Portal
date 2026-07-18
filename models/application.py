@@ -86,18 +86,40 @@ def get_application_by_id(application_id: int):
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
             """SELECT a.*,
+                      s.id as student_id,
                       s.name as student_name, s.email as student_email,
                       s.college as student_college, s.branch as student_branch,
+                      s.current_year, s.gpa_cgpa, s.mobile_no as phone,
+                      s.profile_summary, s.profile_photo_url as profile_photo,
                       j.title as job_title, j.job_type,
-                      c.company_name
+                      c.company_name,
+                      r.file_url as resume_url
                FROM applications a
                JOIN students s ON a.student_id = s.id
                JOIN jobs j ON a.job_id = j.id
                JOIN clients c ON j.client_id = c.id
+               LEFT JOIN resumes r ON a.resume_id = r.id
                WHERE a.id = %s""",
             (application_id,)
         )
         row = cursor.fetchone()
+
+        if row:
+            cursor2 = conn.cursor(dictionary=True)
+            cursor2.execute(
+                "SELECT skill_name, level FROM skills WHERE student_id = %s", (row["student_id"],)
+            )
+            row["skills"] = cursor2.fetchall()
+            cursor2.close()
+
+            cursor3 = conn.cursor(dictionary=True)
+            cursor3.execute(
+                "SELECT certificate_name, issued_by, file_url FROM certifications WHERE student_id = %s",
+                (row["student_id"],)
+            )
+            row["certificates"] = cursor3.fetchall()
+            cursor3.close()
+
         cursor.close()
         return row
     finally:
@@ -432,10 +454,13 @@ def get_applicant_profile_for_client(application_id: int, client_id: int):
             """SELECT a.*, j.title as job_title, j.client_id,
                       s.id as student_id, s.name as student_name, s.email as student_email,
                       s.college, s.branch, s.current_year, s.gpa_cgpa, s.profile_summary,
-                      s.linkedin_url, s.city, s.state
+                      s.linkedin_url, s.city, s.state, s.mobile_no as phone,
+                      s.profile_photo_url as profile_photo,
+                      r.file_url as resume_url
                FROM applications a
                JOIN jobs j ON a.job_id = j.id
                JOIN students s ON a.student_id = s.id
+               LEFT JOIN resumes r ON a.resume_id = r.id
                WHERE a.id = %s AND j.client_id = %s""",
             (application_id, client_id)
         )
@@ -458,6 +483,14 @@ def get_applicant_profile_for_client(application_id: int, client_id: int):
             )
             row["skills"] = cursor3.fetchall()
             cursor3.close()
+
+            cursor4 = conn.cursor(dictionary=True)
+            cursor4.execute(
+                "SELECT certificate_name, issued_by, file_url FROM certifications WHERE student_id = %s",
+                (row["student_id"],)
+            )
+            row["certificates"] = cursor4.fetchall()
+            cursor4.close()
 
         cursor.close()
         return row
@@ -511,17 +544,19 @@ def get_applicant_emails_for_job(job_id: int, client_id: int):
 
 
 def get_student_and_job_for_application(application_id: int):
-    """Lightweight lookup — just student_id, student_name, and job_title,
-    for use in notification messages after a status change. Assumes
-    ownership has already been validated by the caller."""
+    """Lookup for notification/email messages after a status change —
+    student_id, student_name, student_email, job_title, company_name.
+    Assumes ownership has already been validated by the caller."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            """SELECT a.student_id, s.name as student_name, j.title as job_title
+            """SELECT a.student_id, s.name as student_name, s.email as student_email,
+                      j.title as job_title, c.company_name
                FROM applications a
                JOIN students s ON a.student_id = s.id
                JOIN jobs j ON a.job_id = j.id
+               JOIN clients c ON j.client_id = c.id
                WHERE a.id = %s""",
             (application_id,)
         )

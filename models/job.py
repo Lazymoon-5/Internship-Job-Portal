@@ -69,7 +69,7 @@ def list_jobs(search="", status_filter="", page=1, per_page=10):
 
         cursor.execute(
             f"""SELECT j.*, c.company_name,
-                       (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as application_count
+                       (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applications_count
                 FROM jobs j
                 JOIN clients c ON j.client_id = c.id
                 {where_sql}
@@ -107,12 +107,19 @@ def get_job_by_id(job_id: int):
         conn.close()
 
 
-def update_job_status(job_id: int, status: str) -> bool:
-    """status: 'Pending', 'Approved', 'Rejected', or 'Closed'"""
+def update_job_status(job_id: int, status: str, rejection_reason: str = None) -> bool:
+    """status: 'Pending', 'Approved', 'Rejected', or 'Closed'.
+    rejection_reason is optional, only meaningful when status='Rejected'."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE jobs SET status = %s WHERE id = %s", (status, job_id))
+        if rejection_reason is not None:
+            cursor.execute(
+                "UPDATE jobs SET status = %s, rejection_reason = %s WHERE id = %s",
+                (status, rejection_reason, job_id)
+            )
+        else:
+            cursor.execute("UPDATE jobs SET status = %s WHERE id = %s", (status, job_id))
         conn.commit()
         updated = cursor.rowcount > 0
         cursor.close()
@@ -242,7 +249,7 @@ def list_jobs_by_client(client_id: int, search="", status_filter="", page=1, per
 
         cursor.execute(
             f"""SELECT j.*,
-                       (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count
+                       (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applications_count
                 FROM jobs j
                 {where_sql}
                 ORDER BY j.created_at DESC LIMIT %s OFFSET %s""",
@@ -416,7 +423,7 @@ def get_active_jobs_for_client(client_id: int, limit=5):
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
             """SELECT j.id, j.title, j.status, j.last_date_to_apply,
-                      (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count
+                      (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applications_count
                FROM jobs j
                WHERE j.client_id = %s AND j.status IN ('Approved','Pending')
                ORDER BY j.created_at DESC LIMIT %s""",

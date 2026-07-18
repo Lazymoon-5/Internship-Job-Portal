@@ -165,6 +165,7 @@ def init_db():
                 salary_stipend VARCHAR(100),
                 last_date_to_apply DATE,
                 status ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft',
+                rejection_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -361,6 +362,19 @@ def init_db():
             cursor6.close()
         finally:
             conn6.close()
+
+        # ---- rejection_reason column on jobs ----
+        conn7 = get_db_connection()
+        try:
+            cursor7 = conn7.cursor()
+            try:
+                cursor7.execute("ALTER TABLE jobs ADD COLUMN rejection_reason TEXT")
+                conn7.commit()
+            except Exception:
+                conn7.rollback()
+            cursor7.close()
+        finally:
+            conn7.close()
 
         print("[DB] Connected and tables verified.")
     finally:

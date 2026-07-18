@@ -38,7 +38,8 @@ def approve_job_route(job_id):
 @admin_jobs_bp.route("/<int:job_id>/reject", methods=["PATCH"])
 @admin_required
 def reject_job_route(job_id):
-    response, status_code = reject_job(job_id)
+    data = request.get_json(silent=True) or {}
+    response, status_code = reject_job(job_id, rejection_reason=data.get("rejection_reason"))
     return jsonify(response), status_code
 
 
