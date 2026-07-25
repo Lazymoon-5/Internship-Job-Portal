@@ -24,20 +24,30 @@ from routes.client_jobs_routes import client_jobs_bp
 from routes.client_applicants_routes import client_applicants_bp
 from routes.public_jobs_routes import public_jobs_bp
 from routes.contact_routes import contact_bp
+from routes.client_notifications_routes import client_notifications_bp
+from routes.student_notifications_routes import student_notifications_bp
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Allow requests from the React frontend. Add your deployed frontend
-    # URL here once it exists (e.g. "https://placify-frontend.vercel.app")
-    CORS(app, resources={r"/api/*": {"origins": [
+    # Allow requests from the React frontend. Local dev origins are
+    # always allowed; add deployed frontend URLs via the ALLOWED_ORIGINS
+    # env var (comma-separated) so new frontend domains can be added
+    # from Render's dashboard without a code change/redeploy.
+    default_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-    ]}}, supports_credentials=True)
+    ]
+    extra_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
+    extra_origins = [o.strip() for o in extra_origins_env.split(",") if o.strip()]
+    all_origins = default_origins + extra_origins
+
+    CORS(app, resources={r"/api/*": {"origins": all_origins}}, supports_credentials=True)
+    print(f"[CORS] Allowed origins: {all_origins}")
 
     try:
         init_db()
@@ -74,6 +84,8 @@ def create_app():
     app.register_blueprint(client_applicants_bp)
     app.register_blueprint(public_jobs_bp)
     app.register_blueprint(contact_bp)
+    app.register_blueprint(client_notifications_bp)
+    app.register_blueprint(student_notifications_bp)
 
     @app.route("/")
     def health_check():

@@ -26,6 +26,7 @@ from config.email_service import send_otp_email, send_reset_password_email
 def register_student(data):
     """
     Expects data = {name, email, password, college, branch}
+    Optional: experience_level ("Fresher"|"Experienced"), years_of_experience
 
     Creates the student as UNVERIFIED and sends an OTP to their email.
     They must call verify_otp (purpose='registration') before they can
@@ -47,6 +48,25 @@ def register_student(data):
             "message": "An account with this email already exists."
         }, 409
 
+    experience_level = (data.get("experience_level") or "Fresher").strip()
+    if experience_level not in ("Fresher", "Experienced"):
+        return {
+            "success": False,
+            "message": "experience_level must be 'Fresher' or 'Experienced'."
+        }, 400
+
+    years_of_experience = data.get("years_of_experience", 0) or 0
+    try:
+        years_of_experience = float(years_of_experience)
+    except (TypeError, ValueError):
+        return {"success": False, "message": "years_of_experience must be a number."}, 400
+
+    if experience_level == "Experienced" and years_of_experience <= 0:
+        return {
+            "success": False,
+            "message": "years_of_experience is required and must be greater than 0 for Experienced students."
+        }, 400
+
     password_hash = generate_password_hash(data["password"])
 
     student = add_student({
@@ -55,6 +75,8 @@ def register_student(data):
         "password_hash": password_hash,
         "college": data["college"].strip(),
         "branch": data["branch"].strip(),
+        "experience_level": experience_level,
+        "years_of_experience": years_of_experience,
     })
 
     otp_code = create_otp(email, purpose="registration")
@@ -93,6 +115,21 @@ def verify_registration_otp(data):
         return {"success": False, "message": message}, 400
 
     mark_verified(email)
+
+    # Notify all admins — best-effort, never blocks verification itself
+    try:
+        from models.admin import list_all_admin_ids
+        from models.notification import create_notification
+        student = find_by_email(email)
+        student_name = student.name if student else email
+        for admin_id in list_all_admin_ids():
+            create_notification(
+                user_type="admin", user_id=admin_id,
+                title="New Student Verified",
+                message=f"{student_name} ({email}) has verified their account.",
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to notify admins of student verification: {e}")
 
     return {
         "success": True,

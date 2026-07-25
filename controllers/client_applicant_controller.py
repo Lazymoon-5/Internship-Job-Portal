@@ -1,6 +1,11 @@
 import models.application as application_model
 import models.client as client_model
-from config.email_service import send_recruiter_message_email
+import models.notification as notification_model
+from config.email_service import (
+    send_recruiter_message_email,
+    send_status_update_email,
+    send_rejection_email,
+)
 
 
 def get_applicants(client_id, job_id, args):
@@ -39,10 +44,41 @@ def get_applicant_profile(client_id, application_id):
     return {"success": True, "applicant": applicant}, 200
 
 
+def _notify_student_status_change(application_id, title, message_template, new_status_label=None):
+    """
+    Best-effort — never blocks the actual status change if this fails.
+    Sends BOTH an in-app notification and a real email (E3/E4).
+    """
+    try:
+        info = application_model.get_student_and_job_for_application(application_id)
+        if not info:
+            return
+
+        notification_model.create_notification(
+            user_type="student",
+            user_id=info["student_id"],
+            title=title,
+            message=message_template.format(job_title=info["job_title"]),
+        )
+
+        if new_status_label:
+            send_status_update_email(
+                info["student_email"], info["job_title"], info["company_name"], new_status_label
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION/EMAIL] Failed to notify student for application {application_id}: {e}")
+
+
 def shortlist_applicant(client_id, application_id):
     updated = application_model.update_application_status_by_client(application_id, client_id, "Shortlisted")
     if not updated:
         return {"success": False, "message": "Applicant not found."}, 404
+
+    _notify_student_status_change(
+        application_id, "Application Shortlisted",
+        "Good news! You've been shortlisted for {job_title}.",
+        new_status_label="Shortlisted",
+    )
     return {"success": True, "message": "Candidate shortlisted."}, 200
 
 
@@ -50,6 +86,12 @@ def schedule_interview(client_id, application_id):
     updated = application_model.update_application_status_by_client(application_id, client_id, "Interview")
     if not updated:
         return {"success": False, "message": "Applicant not found."}, 404
+
+    _notify_student_status_change(
+        application_id, "Interview Scheduled",
+        "You've been moved to the interview stage for {job_title}.",
+        new_status_label="Interview Scheduled",
+    )
     return {"success": True, "message": "Candidate moved to interview stage."}, 200
 
 
@@ -57,6 +99,12 @@ def extend_offer(client_id, application_id):
     updated = application_model.update_application_status_by_client(application_id, client_id, "Offered")
     if not updated:
         return {"success": False, "message": "Applicant not found."}, 404
+
+    _notify_student_status_change(
+        application_id, "Offer Received!",
+        "Congratulations! You've received an offer for {job_title}.",
+        new_status_label="Offer Extended",
+    )
     return {"success": True, "message": "Offer extended to candidate."}, 200
 
 
@@ -64,6 +112,22 @@ def reject_applicant(client_id, application_id):
     updated = application_model.update_application_status_by_client(application_id, client_id, "Rejected")
     if not updated:
         return {"success": False, "message": "Applicant not found."}, 404
+
+    # In-app notification (kept as before)
+    try:
+        info = application_model.get_student_and_job_for_application(application_id)
+        if info:
+            notification_model.create_notification(
+                user_type="student",
+                user_id=info["student_id"],
+                title="Application Update",
+                message=f"Your application for {info['job_title']} was not successful this time.",
+            )
+            # E4 — dedicated rejection email, kept neutral/kind in tone
+            send_rejection_email(info["student_email"], info["job_title"], info["company_name"])
+    except Exception as e:
+        print(f"[NOTIFICATION/EMAIL] Failed to notify student of rejection for application {application_id}: {e}")
+
     return {"success": True, "message": "Application rejected."}, 200
 
 

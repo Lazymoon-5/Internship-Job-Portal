@@ -16,6 +16,8 @@ PROFILE_FIELDS = [
     "department", "current_year", "mobile_no", "profile_summary",
     "city", "pincode", "state", "linkedin_url", "enrollment_no",
     "college_address", "course", "gpa_cgpa",
+    "experience_level", "years_of_experience", "job_designation",
+    "experience_company", "experience_duration",
 ]
 
 
@@ -29,15 +31,30 @@ def get_profile(student_id: int):
                       department, current_year, mobile_no, profile_summary,
                       city, pincode, state, linkedin_url, enrollment_no,
                       college_address, course, gpa_cgpa, profile_photo_url,
-                      profile_completed
+                      profile_completed, experience_level, years_of_experience,
+                      job_designation, experience_company, experience_duration
                FROM students WHERE id = %s""",
             (student_id,)
         )
         row = cursor.fetchone()
+        if row:
+            row["gpa"] = row.get("gpa_cgpa")  # legacy alias, per v3 doc §1.3
+            row["profile_completion"] = _calculate_completion(row)
         cursor.close()
         return row
     finally:
         conn.close()
+
+
+def _calculate_completion(profile: dict) -> int:
+    """0-100 — percentage of profile fields that are actually filled in."""
+    checklist = [
+        "department", "current_year", "mobile_no", "profile_summary",
+        "city", "pincode", "state", "linkedin_url", "enrollment_no",
+        "college_address", "course", "gpa_cgpa", "profile_photo_url",
+    ]
+    filled = sum(1 for field in checklist if profile.get(field))
+    return round((filled / len(checklist)) * 100)
 
 
 def update_profile(student_id: int, data: dict) -> bool:
@@ -47,7 +64,14 @@ def update_profile(student_id: int, data: dict) -> bool:
     and the Settings page (full edit). `name` is also editable here
     even though it lives in the core students table (email, however,
     is intentionally NEVER updatable — matches "Cannot Change" in the UI).
+
+    Accepts "gpa" as a legacy alias for "gpa_cgpa" — if the frontend
+    sends either key, it saves to the same gpa_cgpa column.
     """
+    data = dict(data)  # avoid mutating the caller's dict
+    if "gpa" in data and "gpa_cgpa" not in data:
+        data["gpa_cgpa"] = data.pop("gpa")
+
     updatable_fields = ["name"] + PROFILE_FIELDS
     set_clauses = []
     values = []

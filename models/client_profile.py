@@ -30,10 +30,24 @@ def get_profile(client_id: int):
             (client_id,)
         )
         row = cursor.fetchone()
+        if row:
+            row["profile_completion"] = _calculate_completion(row)
         cursor.close()
         return row
     finally:
         conn.close()
+
+
+def _calculate_completion(profile: dict) -> int:
+    """0-100 — percentage of profile fields that are actually filled in."""
+    checklist = [
+        "contact", "company_size", "year_established", "city", "pincode", "state",
+        "address", "about_company", "company_summary", "hr_name", "hr_contact_email",
+        "hr_phone_number", "hiring_locations", "preferred_job_types",
+        "company_registration_number",
+    ]
+    filled = sum(1 for field in checklist if profile.get(field))
+    return round((filled / len(checklist)) * 100)
 
 
 def update_profile(client_id: int, data: dict) -> bool:

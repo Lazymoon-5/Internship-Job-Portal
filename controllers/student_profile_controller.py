@@ -8,6 +8,7 @@ multiple times (once per section) and marks completion on the final step.
 import models.student_profile as profile_model
 import models.certification as certification_model
 import models.skill as skill_model
+import models.experience as experience_model
 
 
 def get_profile(student_id):
@@ -17,12 +18,24 @@ def get_profile(student_id):
 
     profile["certifications"] = certification_model.list_certifications(student_id)
     profile["skills"] = skill_model.list_skills(student_id)
+    profile["experiences"] = experience_model.list_experiences(student_id)
 
     return {"success": True, "profile": profile}, 200
 
 
 def update_profile(student_id, data, mark_completed=False):
+    # "experiences" is handled separately (its own table) — pop it out
+    # before passing the rest to the flat-column update, so it doesn't
+    # get silently ignored by update_profile's field whitelist.
+    experiences = data.pop("experiences", None)
+
     updated = profile_model.update_profile(student_id, data)
+
+    if experiences is not None:
+        if not isinstance(experiences, list):
+            return {"success": False, "message": "experiences must be an array."}, 400
+        experience_model.replace_experiences(student_id, experiences)
+        updated = True
 
     if mark_completed:
         profile_model.mark_profile_completed(student_id)

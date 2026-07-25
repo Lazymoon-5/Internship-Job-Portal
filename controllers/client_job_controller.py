@@ -6,6 +6,24 @@ instead of only via the test-seed script.
 """
 
 import models.job as job_model
+import models.client as client_model
+import models.notification as notification_model
+import models.admin as admin_model
+
+
+def _notify_admins_job_pending(client_id, job_title):
+    """Best-effort broadcast to every admin — never blocks the job action itself."""
+    try:
+        client = client_model.find_by_id(client_id)
+        company_name = client.company_name if client else "A company"
+        for admin_id in admin_model.list_all_admin_ids():
+            notification_model.create_notification(
+                user_type="admin", user_id=admin_id,
+                title="New Job Awaiting Approval",
+                message=f'{company_name} submitted "{job_title}" for approval.',
+            )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to notify admins of pending job: {e}")
 
 
 def post_job(client_id, data, submit_now=False):
@@ -37,6 +55,7 @@ def post_job(client_id, data, submit_now=False):
 
     if submit_now:
         job_model.update_job_status_by_client(job_id, client_id, "Pending")
+        _notify_admins_job_pending(client_id, title)
         message = "Job submitted for admin approval."
     else:
         message = "Job saved as draft."
@@ -99,6 +118,7 @@ def submit_job(client_id, job_id):
         return {"success": False, "message": "Only draft jobs can be submitted."}, 400
 
     job_model.update_job_status_by_client(job_id, client_id, "Pending")
+    _notify_admins_job_pending(client_id, job["title"])
     return {"success": True, "message": "Job submitted for admin approval."}, 200
 
 

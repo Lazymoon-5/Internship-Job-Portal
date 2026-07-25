@@ -3,6 +3,7 @@ Manage Companies controller — list/search/filter, approve/reject/block, delete
 """
 
 import models.client as client_model
+import models.notification as notification_model
 
 
 def get_companies(args):
@@ -30,12 +31,23 @@ def get_company_detail(client_id):
     return {"success": True, "company": client.to_dict()}, 200
 
 
+def _notify_company(client_id, title, message):
+    try:
+        notification_model.create_notification(
+            user_type="client", user_id=client_id, title=title, message=message
+        )
+    except Exception as e:
+        print(f"[NOTIFICATION] Failed to notify client {client_id}: {e}")
+
+
 def approve_company(client_id):
     client = client_model.find_by_id(client_id)
     if not client:
         return {"success": False, "message": "Company not found."}, 404
 
     client_model.update_admin_status(client_id, "Approved")
+    _notify_company(client_id, "Account Approved",
+                     "Your company account has been approved by an administrator.")
     return {"success": True, "message": "Company approved."}, 200
 
 
@@ -45,6 +57,8 @@ def reject_company(client_id):
         return {"success": False, "message": "Company not found."}, 404
 
     client_model.update_admin_status(client_id, "Rejected")
+    _notify_company(client_id, "Account Rejected",
+                     "Your company account application was rejected by an administrator.")
     return {"success": True, "message": "Company rejected."}, 200
 
 
@@ -54,6 +68,8 @@ def block_company(client_id):
         return {"success": False, "message": "Company not found."}, 404
 
     client_model.update_admin_status(client_id, "Blocked")
+    _notify_company(client_id, "Account Blocked",
+                     "Your company account has been blocked by an administrator. Contact support for help.")
     return {"success": True, "message": "Company blocked."}, 200
 
 

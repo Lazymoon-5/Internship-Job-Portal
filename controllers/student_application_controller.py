@@ -1,5 +1,10 @@
 import models.application as application_model
 import models.resume as resume_model
+import models.job as job_model
+import models.student as student_model
+import models.client as client_model
+import models.notification as notification_model
+from config.email_service import send_application_confirmation_email, send_new_applicant_email
 
 
 def apply_to_job(student_id, job_id, data):
@@ -25,6 +30,37 @@ def apply_to_job(student_id, job_id, data):
     if error:
         status_code = 409 if "already applied" in error else 400
         return {"success": False, "message": error}, status_code
+
+    # Notify + email the company that owns this job, and email the
+    # student a confirmation — all best-effort, never blocks the
+    # application itself if something here fails.
+    try:
+        job = job_model.get_job_by_id(job_id)
+        student = student_model.find_by_id(student_id)
+        if job and student:
+            company_name = job.get("company_name", "the company")
+
+            notification_model.create_notification(
+                user_type="client",
+                user_id=job["client_id"],
+                title="New Application Received",
+                message=f"{student.name} applied for {job['title']}.",
+            )
+
+            # E1 — confirmation email to the student
+            send_application_confirmation_email(
+                student.email, new_id, job["title"], company_name,
+                applied_date=__import__("datetime").datetime.utcnow().strftime("%B %d, %Y"),
+                status="Applied",
+            )
+
+            # E2 — new applicant alert to the company
+            client = client_model.find_by_id(job["client_id"])
+            if client:
+                send_new_applicant_email(client.email, company_name, student.name, job["title"])
+
+    except Exception as e:
+        print(f"[NOTIFICATION/EMAIL] Failed during post-application hooks: {e}")
 
     return {"success": True, "message": "Application submitted successfully.", "id": new_id}, 201
 

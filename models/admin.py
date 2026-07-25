@@ -119,3 +119,21 @@ def update_password(admin_id: int, new_password_hash: str) -> bool:
             record["password_hash"] = new_password_hash
             return True
     return False
+
+
+def list_all_admin_ids():
+    """Returns a list of every admin's id — used to broadcast a
+    notification to all admins at once (e.g. new student verified,
+    new job awaiting approval), since notifications are per-admin."""
+    if is_db_available():
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM admins")
+            ids = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            return ids
+        finally:
+            conn.close()
+
+    return [record["id"] for record in _memory_admins]

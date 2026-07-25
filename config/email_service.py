@@ -158,3 +158,120 @@ def send_contact_form_notification(submitter_name: str, submitter_email: str, me
     </div>
     """
     return send_email(notification_email, subject, body_html)
+
+
+# ================= Application lifecycle emails (E1-E6) =================
+
+def send_application_confirmation_email(student_email: str, application_id: int,
+                                          job_title: str, company_name: str,
+                                          applied_date: str, status: str) -> bool:
+    """E1 — sent to the STUDENT right after they apply."""
+    subject = f"Application Confirmed: {job_title} at {company_name}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p>Your application has been submitted successfully.</p>
+        <div style="background: #F5F6F8; padding: 16px; border-radius: 8px;">
+            <p style="margin: 4px 0;"><strong>Application ID:</strong> #{application_id}</p>
+            <p style="margin: 4px 0;"><strong>Job:</strong> {job_title}</p>
+            <p style="margin: 4px 0;"><strong>Company:</strong> {company_name}</p>
+            <p style="margin: 4px 0;"><strong>Applied on:</strong> {applied_date}</p>
+            <p style="margin: 4px 0;"><strong>Status:</strong> {status}</p>
+        </div>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            Track your application anytime by logging in to Placify.
+        </p>
+    </div>
+    """
+    return send_email(student_email, subject, body_html)
+
+
+def send_new_applicant_email(company_email: str, company_name: str,
+                               student_name: str, job_title: str) -> bool:
+    """E2 — sent to the COMPANY's HR email when a student applies."""
+    subject = f"New Applicant for {job_title}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p>{student_name} just applied for <strong>{job_title}</strong>.</p>
+        <p>Log in to your Placify Company Portal to review this applicant.</p>
+        <a href="http://localhost:3000/company/login"
+           style="display: inline-block; background: #D98E04; color: white;
+                  padding: 12px 24px; border-radius: 8px; text-decoration: none;
+                  font-weight: bold; margin: 12px 0;">
+            View Applicants
+        </a>
+    </div>
+    """
+    return send_email(company_email, subject, body_html)
+
+
+def send_status_update_email(student_email: str, job_title: str, company_name: str,
+                               new_status: str, encouraging: bool = True) -> bool:
+    """E3 — shortlisted/interview/offer. Reused for all three with different new_status wording."""
+    subject = f"Update on your application: {job_title}"
+    color = "#1F8A5F" if encouraging else "#1D3E82"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p>Your application for <strong>{job_title}</strong> at <strong>{company_name}</strong>
+           has a status update:</p>
+        <div style="background: #F5F6F8; padding: 16px; border-radius: 8px; text-align: center;">
+            <span style="font-size: 18px; font-weight: bold; color: {color};">{new_status}</span>
+        </div>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            Log in to Placify to see the full details.
+        </p>
+    </div>
+    """
+    return send_email(student_email, subject, body_html)
+
+
+def send_rejection_email(student_email: str, job_title: str, company_name: str) -> bool:
+    """E4 — kept neutral/kind in tone, as requested."""
+    subject = f"Update on your application: {job_title}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p>Thank you for applying to <strong>{job_title}</strong> at <strong>{company_name}</strong>.</p>
+        <p>After careful review, the company has decided to move forward with other candidates
+           for this particular role. We know this isn't the news you were hoping for, and we
+           encourage you to keep exploring other opportunities on Placify.</p>
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            Log in to Placify to browse more openings.
+        </p>
+    </div>
+    """
+    return send_email(student_email, subject, body_html)
+
+
+def send_job_approved_email(company_email: str, job_title: str) -> bool:
+    """E5 — sent to the COMPANY when Admin approves their job post."""
+    subject = f"Your job post is now live: {job_title}"
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p>Good news — <strong>{job_title}</strong> has been approved and is now
+           <span style="color: #1F8A5F; font-weight: bold;">live</span> on Placify.
+           Students can now see and apply to this role.</p>
+    </div>
+    """
+    return send_email(company_email, subject, body_html)
+
+
+def send_job_rejected_email(company_email: str, job_title: str, reason: str = "") -> bool:
+    """E6 — sent to the COMPANY when Admin rejects their job post."""
+    subject = f"Your job post was not approved: {job_title}"
+    reason_html = f'<p><strong>Reason:</strong> {reason}</p>' if reason else ""
+    body_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto;">
+        <h2 style="color: #1D3E82;">Placify</h2>
+        <p><strong>{job_title}</strong> was not approved by an administrator and is not
+           currently visible to students.</p>
+        {reason_html}
+        <p style="color: #6B7280; font-size: 13px; margin-top: 16px;">
+            You can edit and resubmit this job post from your Company Portal.
+        </p>
+    </div>
+    """
+    return send_email(company_email, subject, body_html)

@@ -84,6 +84,11 @@ def init_db():
                 is_verified BOOLEAN DEFAULT FALSE,
                 google_id VARCHAR(255) DEFAULT NULL,
                 status ENUM('Active','Blocked') DEFAULT 'Active',
+                experience_level ENUM('Fresher','Experienced') DEFAULT 'Fresher',
+                years_of_experience DECIMAL(4,1) DEFAULT 0,
+                job_designation VARCHAR(200),
+                experience_company VARCHAR(200),
+                experience_duration VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
@@ -165,6 +170,7 @@ def init_db():
                 salary_stipend VARCHAR(100),
                 last_date_to_apply DATE,
                 status ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft',
+                rejection_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -240,6 +246,19 @@ def init_db():
                 FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_experiences (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id INT NOT NULL,
+                job_designation VARCHAR(200),
+                company VARCHAR(200),
+                duration VARCHAR(100),
+                years DECIMAL(4,1) DEFAULT 0,
+                sort_order INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
 
         conn.commit()
         cursor.close()
@@ -265,6 +284,11 @@ def init_db():
             ("gpa_cgpa", "VARCHAR(20)"),
             ("profile_photo_url", "VARCHAR(500)"),
             ("profile_completed", "BOOLEAN DEFAULT FALSE"),
+            ("experience_level", "ENUM('Fresher','Experienced') DEFAULT 'Fresher'"),
+            ("years_of_experience", "DECIMAL(4,1) DEFAULT 0"),
+            ("job_designation", "VARCHAR(200)"),
+            ("experience_company", "VARCHAR(200)"),
+            ("experience_duration", "VARCHAR(100)"),
         ]
         conn2 = get_db_connection()
         try:
@@ -361,6 +385,19 @@ def init_db():
             cursor6.close()
         finally:
             conn6.close()
+
+        # ---- rejection_reason column on jobs ----
+        conn7 = get_db_connection()
+        try:
+            cursor7 = conn7.cursor()
+            try:
+                cursor7.execute("ALTER TABLE jobs ADD COLUMN rejection_reason TEXT")
+                conn7.commit()
+            except Exception:
+                conn7.rollback()
+            cursor7.close()
+        finally:
+            conn7.close()
 
         print("[DB] Connected and tables verified.")
     finally:
