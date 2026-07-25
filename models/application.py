@@ -382,7 +382,8 @@ def list_applications_for_job(job_id: int, client_id: int, search="", status_fil
         cursor.execute(
             f"""SELECT a.id, a.status, a.applied_at, a.viewed_by_company,
                        s.id as student_id, s.name as student_name, s.college, s.branch,
-                       s.current_year, s.gpa_cgpa, s.profile_summary
+                       s.current_year, s.gpa_cgpa, s.profile_summary,
+                       s.profile_photo_url as profile_photo
                 FROM applications a
                 JOIN students s ON a.student_id = s.id
                 {where_sql}
