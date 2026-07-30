@@ -22,7 +22,8 @@ _memory_otps = {}           # (email, purpose) -> {otp_code, expires_at, is_used
 
 class Student:
     def __init__(self, id, name, email, password_hash, college, branch,
-                 is_verified=False, google_id=None, status="Active"):
+                 is_verified=False, google_id=None, status="Active",
+                 experience_level="Fresher", years_of_experience=0):
         self.id = id
         self.name = name
         self.email = email
@@ -32,6 +33,8 @@ class Student:
         self.is_verified = bool(is_verified)
         self.google_id = google_id
         self.status = status or "Active"
+        self.experience_level = experience_level or "Fresher"
+        self.years_of_experience = float(years_of_experience or 0)
 
     def to_dict(self, include_password=False):
         data = {
@@ -42,6 +45,8 @@ class Student:
             "branch": self.branch,
             "is_verified": self.is_verified,
             "status": self.status,
+            "experience_level": self.experience_level,
+            "years_of_experience": self.years_of_experience,
         }
         if include_password:
             data["password_hash"] = self.password_hash
@@ -56,11 +61,14 @@ def add_student(student_data: dict):
         try:
             cursor = conn.cursor()
             cursor.execute(
-                """INSERT INTO students (name, email, password_hash, college, branch)
-                   VALUES (%s, %s, %s, %s, %s)""",
+                """INSERT INTO students (name, email, password_hash, college, branch,
+                   experience_level, years_of_experience)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                 (student_data["name"], student_data["email"],
                  student_data["password_hash"], student_data["college"],
-                 student_data["branch"])
+                 student_data["branch"],
+                 student_data.get("experience_level", "Fresher"),
+                 student_data.get("years_of_experience", 0))
             )
             conn.commit()
             new_id = cursor.lastrowid
@@ -76,6 +84,8 @@ def add_student(student_data: dict):
         "email": student_data["email"], "password_hash": student_data["password_hash"],
         "college": student_data["college"], "branch": student_data["branch"],
         "is_verified": False, "google_id": None,
+        "experience_level": student_data.get("experience_level", "Fresher"),
+        "years_of_experience": student_data.get("years_of_experience", 0),
     }
     _memory_students.append(record)
     _memory_next_id += 1
@@ -96,7 +106,8 @@ def find_by_email(email: str):
                 return None
             return Student(**{k: row[k] for k in
                                ["id", "name", "email", "password_hash", "college",
-                                "branch", "is_verified", "google_id", "status"]})
+                                "branch", "is_verified", "google_id", "status",
+                                "experience_level", "years_of_experience"]})
         finally:
             conn.close()
 
@@ -457,7 +468,9 @@ def find_by_id(student_id: int):
             return Student(id=row["id"], name=row["name"], email=row["email"],
                            password_hash=row["password_hash"], college=row["college"],
                            branch=row["branch"], is_verified=row["is_verified"],
-                           google_id=row["google_id"], status=row["status"])
+                           google_id=row["google_id"], status=row["status"],
+                           experience_level=row["experience_level"],
+                           years_of_experience=row["years_of_experience"])
         finally:
             conn.close()
 

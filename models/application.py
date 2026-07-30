@@ -91,6 +91,8 @@ def get_application_by_id(application_id: int):
                       s.college as student_college, s.branch as student_branch,
                       s.current_year, s.gpa_cgpa, s.mobile_no as phone,
                       s.profile_summary, s.profile_photo_url as profile_photo,
+                      s.experience_level, s.years_of_experience,
+                      s.job_designation, s.experience_company, s.experience_duration,
                       j.title as job_title, j.job_type,
                       c.company_name,
                       r.file_url as resume_url
@@ -119,6 +121,15 @@ def get_application_by_id(application_id: int):
             )
             row["certificates"] = cursor3.fetchall()
             cursor3.close()
+
+            cursor4 = conn.cursor(dictionary=True)
+            cursor4.execute(
+                """SELECT id, job_designation, company, duration, years
+                   FROM student_experiences WHERE student_id = %s ORDER BY sort_order ASC""",
+                (row["student_id"],)
+            )
+            row["experiences"] = cursor4.fetchall()
+            cursor4.close()
 
         cursor.close()
         return row
@@ -371,7 +382,8 @@ def list_applications_for_job(job_id: int, client_id: int, search="", status_fil
         cursor.execute(
             f"""SELECT a.id, a.status, a.applied_at, a.viewed_by_company,
                        s.id as student_id, s.name as student_name, s.college, s.branch,
-                       s.current_year, s.gpa_cgpa, s.profile_summary
+                       s.current_year, s.gpa_cgpa, s.profile_summary,
+                       s.profile_photo_url as profile_photo
                 FROM applications a
                 JOIN students s ON a.student_id = s.id
                 {where_sql}
@@ -456,6 +468,8 @@ def get_applicant_profile_for_client(application_id: int, client_id: int):
                       s.college, s.branch, s.current_year, s.gpa_cgpa, s.profile_summary,
                       s.linkedin_url, s.city, s.state, s.mobile_no as phone,
                       s.profile_photo_url as profile_photo,
+                      s.experience_level, s.years_of_experience,
+                      s.job_designation, s.experience_company, s.experience_duration,
                       r.file_url as resume_url
                FROM applications a
                JOIN jobs j ON a.job_id = j.id
@@ -491,6 +505,15 @@ def get_applicant_profile_for_client(application_id: int, client_id: int):
             )
             row["certificates"] = cursor4.fetchall()
             cursor4.close()
+
+            cursor5 = conn.cursor(dictionary=True)
+            cursor5.execute(
+                """SELECT id, job_designation, company, duration, years
+                   FROM student_experiences WHERE student_id = %s ORDER BY sort_order ASC""",
+                (row["student_id"],)
+            )
+            row["experiences"] = cursor5.fetchall()
+            cursor5.close()
 
         cursor.close()
         return row

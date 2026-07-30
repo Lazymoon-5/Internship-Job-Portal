@@ -23,12 +23,13 @@ from config.email_service import send_otp_email, send_reset_password_email
 
 def register_client(data):
     """
-    Expects data = {company_name, email, password, industry, website (optional)}
+    Expects data = {company_name, email, password, industry, website (optional),
+                     address, city, state, pincode (optional)}
 
     Creates the client as UNVERIFIED and sends an OTP to their email.
     They must call verify_registration_otp before they can log in.
     """
-    required_fields = ["company_name", "email", "password", "industry"]
+    required_fields = ["company_name", "email", "password", "industry", "address", "city", "state"]
     missing = [f for f in required_fields if not data.get(f)]
     if missing:
         return {
@@ -52,6 +53,17 @@ def register_client(data):
         "password_hash": password_hash,
         "industry": data["industry"].strip(),
         "website": (data.get("website") or "").strip(),
+    })
+
+    # Address fields go into the same columns the profile wizard already
+    # writes — reusing that update mechanism instead of touching add_client/
+    # the Client class, so this is a low-risk addition.
+    from models.client_profile import update_profile as update_client_profile
+    update_client_profile(client.id, {
+        "address": data["address"].strip(),
+        "city": data["city"].strip(),
+        "state": data["state"].strip(),
+        "pincode": (data.get("pincode") or "").strip(),
     })
 
     otp_code = create_otp(email, purpose="registration")
