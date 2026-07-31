@@ -6,9 +6,21 @@ Mirrors admin/client notification controllers, for user_type='student'.
 import models.notification as notification_model
 
 
+def safe_int(val, default=1):
+    if val is None:
+        return default
+    try:
+        val_str = str(val).strip()
+        if not val_str or val_str in ("undefined", "null", "None"):
+            return default
+        return int(val_str)
+    except (ValueError, TypeError):
+        return default
+
+
 def get_notifications(student_id, args):
-    page = int(args.get("page", 1))
-    per_page = int(args.get("per_page", 20))
+    page = safe_int(args.get("page"), 1)
+    per_page = safe_int(args.get("per_page"), 20)
 
     notifications, total = notification_model.list_notifications("student", student_id, page, per_page)
     unread_count = notification_model.count_unread("student", student_id)

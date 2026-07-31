@@ -63,11 +63,23 @@ def post_job(client_id, data, submit_now=False):
     return {"success": True, "message": message, "id": job_id}, 201
 
 
+def safe_int(val, default=1):
+    if val is None:
+        return default
+    try:
+        val_str = str(val).strip()
+        if not val_str or val_str in ("undefined", "null", "None"):
+            return default
+        return int(val_str)
+    except (ValueError, TypeError):
+        return default
+
+
 def get_my_jobs(client_id, args):
     search = args.get("search", "").strip()
     status_filter = args.get("status", "").strip()
-    page = int(args.get("page", 1))
-    per_page = int(args.get("per_page", 10))
+    page = safe_int(args.get("page"), 1)
+    per_page = safe_int(args.get("per_page"), 10)
 
     jobs, total = job_model.list_jobs_by_client(client_id, search, status_filter, page, per_page)
 

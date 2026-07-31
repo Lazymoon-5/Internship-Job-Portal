@@ -6,6 +6,7 @@ Kept separate from routes so routes stay thin (just receive request,
 call controller, return response).
 """
 
+import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.student import (
     add_student,

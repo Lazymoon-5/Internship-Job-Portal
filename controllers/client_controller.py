@@ -5,6 +5,7 @@ forgot-password/reset-password/OTP verification.
 Mirrors controllers/student_controller.py exactly, but for Clients.
 """
 
+import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.client import (
     add_client,
