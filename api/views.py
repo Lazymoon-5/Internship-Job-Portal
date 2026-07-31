@@ -343,6 +343,16 @@ def api_client_dashboard_stats(request):
 
 @csrf_exempt
 @client_required
+def api_client_dashboard_recent_applications(request):
+    return json_response(get_client_recent_applications(request.client_id))
+
+@csrf_exempt
+@client_required
+def api_client_dashboard_active_jobs(request):
+    return json_response(get_client_active_jobs(request.client_id))
+
+@csrf_exempt
+@client_required
 def api_client_profile(request):
     if request.method == "GET":
         return json_response(get_client_profile(request.client_id))
@@ -473,6 +483,11 @@ def api_admin_change_password(request):
 @admin_required
 def api_admin_dashboard_stats(request):
     return json_response(get_admin_dashboard_stats())
+
+@csrf_exempt
+@admin_required
+def api_admin_dashboard_recent_applications(request):
+    return json_response(get_admin_recent_applications())
 
 @csrf_exempt
 @admin_required

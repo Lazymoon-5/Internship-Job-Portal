@@ -47,6 +47,8 @@ urlpatterns = [
     path("client/reset-password", views.api_client_reset_password),
     path("client/change-password", views.api_client_change_password),
     path("client/dashboard/stats", views.api_client_dashboard_stats),
+    path("client/dashboard/recent-applications", views.api_client_dashboard_recent_applications),
+    path("client/dashboard/active-jobs", views.api_client_dashboard_active_jobs),
     path("client/profile", views.api_client_profile),
 
     # Client Jobs & Applicants
@@ -74,6 +76,7 @@ urlpatterns = [
     path("admin/login", views.api_admin_login),
     path("admin/change-password", views.api_admin_change_password),
     path("admin/dashboard/stats", views.api_admin_dashboard_stats),
+    path("admin/dashboard/recent-applications", views.api_admin_dashboard_recent_applications),
 
     # Admin Students Management
     path("admin/students", views.api_admin_students),
