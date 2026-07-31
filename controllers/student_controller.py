@@ -257,6 +257,18 @@ def google_login(data):
     }, 200
 
 
+def _get_frontend_url():
+    url = os.environ.get("FRONTEND_URL", "").strip()
+    if url:
+        return url.rstrip("/")
+    origins = os.environ.get("ALLOWED_ORIGINS", "")
+    if origins:
+        first_origin = [o.strip() for o in origins.split(",") if o.strip()]
+        if first_origin:
+            return first_origin[0].rstrip("/")
+    return "http://localhost:5173"
+
+
 def forgot_password(data):
     """
     Expects data = { "email": str }
@@ -278,7 +290,8 @@ def forgot_password(data):
         }, 200
 
     token = create_reset_token(email)
-    reset_link = f"http://localhost:3000/reset-password?token={token}"
+    frontend_url = _get_frontend_url()
+    reset_link = f"{frontend_url}/reset-password?token={token}"
 
     email_sent = send_reset_password_email(email, reset_link)
 
