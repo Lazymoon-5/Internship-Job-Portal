@@ -10,6 +10,17 @@ layer is already built for it.
 from config.database import get_db_connection
 
 
+def _sanitize_db_param(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple, set)):
+        return ", ".join(str(item) for item in val)
+    if isinstance(val, dict):
+        import json
+        return json.dumps(val)
+    return val
+
+
 def create_application(app_data: dict):
     """app_data = {student_id, job_id, cover_letter, portfolio_link}"""
     conn = get_db_connection()
@@ -19,7 +30,8 @@ def create_application(app_data: dict):
             """INSERT INTO applications (student_id, job_id, cover_letter, portfolio_link)
                VALUES (%s, %s, %s, %s)""",
             (app_data["student_id"], app_data["job_id"],
-             app_data.get("cover_letter", ""), app_data.get("portfolio_link", ""))
+             _sanitize_db_param(app_data.get("cover_letter", "")),
+             _sanitize_db_param(app_data.get("portfolio_link", "")))
         )
         conn.commit()
         new_id = cursor.lastrowid
@@ -238,7 +250,7 @@ def create_application_with_check(student_id: int, job_id: int, cover_letter: st
         cursor2.execute(
             """INSERT INTO applications (student_id, job_id, resume_id, cover_letter, portfolio_link)
                VALUES (%s, %s, %s, %s, %s)""",
-            (student_id, job_id, resume_id, cover_letter, portfolio_link)
+            (_sanitize_db_param(student_id), _sanitize_db_param(job_id), _sanitize_db_param(resume_id), _sanitize_db_param(cover_letter), _sanitize_db_param(portfolio_link))
         )
         conn.commit()
         new_id = cursor2.lastrowid
