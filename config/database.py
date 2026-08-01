@@ -51,7 +51,7 @@ def get_pool():
     if _pool is None:
         from mysql.connector import pooling
         _pool = pooling.MySQLConnectionPool(
-            pool_name="placify_pool", pool_size=5,
+            pool_name="placify_pool", pool_size=20,
             host=DB_CONFIG["host"], port=DB_CONFIG["port"],
             user=DB_CONFIG["user"], password=DB_CONFIG["password"],
             database=DB_CONFIG["database"], charset=DB_CONFIG["charset"],
@@ -290,20 +290,7 @@ def init_db():
             ("experience_company", "VARCHAR(200)"),
             ("experience_duration", "VARCHAR(100)"),
         ]
-        conn2 = get_db_connection()
-        try:
-            cursor2 = conn2.cursor()
-            for col_name, col_type in profile_columns:
-                try:
-                    cursor2.execute(f"ALTER TABLE students ADD COLUMN {col_name} {col_type}")
-                    conn2.commit()
-                except Exception:
-                    conn2.rollback()  # column already exists — fine, skip it
-            cursor2.close()
-        finally:
-            conn2.close()
 
-        # ---- Safe ALTER TABLE for new client (company) profile columns ----
         client_profile_columns = [
             ("contact", "VARCHAR(50)"),
             ("company_size", "VARCHAR(50)"),
@@ -328,77 +315,41 @@ def init_db():
             ("terms_accepted", "BOOLEAN DEFAULT FALSE"),
             ("profile_completed", "BOOLEAN DEFAULT FALSE"),
         ]
-        conn3 = get_db_connection()
-        try:
-            cursor3 = conn3.cursor()
-            for col_name, col_type in client_profile_columns:
-                try:
-                    cursor3.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
-                    conn3.commit()
-                except Exception:
-                    conn3.rollback()
-            cursor3.close()
-        finally:
-            conn3.close()
 
-        # ---- viewed_by_company on applications (existing tables won't
-        # get this from CREATE TABLE IF NOT EXISTS) ----
-        conn4 = get_db_connection()
-        try:
-            cursor4 = conn4.cursor()
-            try:
-                cursor4.execute("ALTER TABLE applications ADD COLUMN viewed_by_company BOOLEAN DEFAULT FALSE")
-                conn4.commit()
-            except Exception:
-                conn4.rollback()
-            cursor4.close()
-        finally:
-            conn4.close()
+        cursor_m = conn.cursor()
+        _add_missing_columns(cursor_m, conn, "students", profile_columns)
+        _add_missing_columns(cursor_m, conn, "clients", client_profile_columns)
+        _add_missing_columns(cursor_m, conn, "applications", [("viewed_by_company", "BOOLEAN DEFAULT FALSE")])
+        _add_missing_columns(cursor_m, conn, "jobs", [("department", "VARCHAR(150)"), ("rejection_reason", "TEXT")])
 
-        # ---- Expand jobs.status enum to include Draft/Filled (existing
-        # tables keep their old enum definition otherwise) ----
-        conn5 = get_db_connection()
         try:
-            cursor5 = conn5.cursor()
-            try:
-                cursor5.execute(
-                    "ALTER TABLE jobs MODIFY COLUMN status "
-                    "ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft'"
-                )
-                conn5.commit()
-            except Exception:
-                conn5.rollback()
-            cursor5.close()
-        finally:
-            conn5.close()
+            cursor_m.execute(
+                "ALTER TABLE jobs MODIFY COLUMN status "
+                "ENUM('Draft','Pending','Approved','Rejected','Closed','Filled') DEFAULT 'Draft'"
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
-        # ---- department column on jobs (existing tables won't get
-        # this from CREATE TABLE IF NOT EXISTS) ----
-        conn6 = get_db_connection()
-        try:
-            cursor6 = conn6.cursor()
-            try:
-                cursor6.execute("ALTER TABLE jobs ADD COLUMN department VARCHAR(150)")
-                conn6.commit()
-            except Exception:
-                conn6.rollback()
-            cursor6.close()
-        finally:
-            conn6.close()
-
-        # ---- rejection_reason column on jobs ----
-        conn7 = get_db_connection()
-        try:
-            cursor7 = conn7.cursor()
-            try:
-                cursor7.execute("ALTER TABLE jobs ADD COLUMN rejection_reason TEXT")
-                conn7.commit()
-            except Exception:
-                conn7.rollback()
-            cursor7.close()
-        finally:
-            conn7.close()
-
+        cursor_m.close()
         print("[DB] Connected and tables verified.")
     finally:
         conn.close()
+
+
+def _add_missing_columns(cursor, conn, table_name, columns):
+    try:
+        cursor.execute(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+            (DB_CONFIG["database"], table_name)
+        )
+        existing = {row[0].lower() for row in cursor.fetchall()}
+        for col_name, col_type in columns:
+            if col_name.lower() not in existing:
+                try:
+                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+    except Exception:
+        pass
