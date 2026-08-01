@@ -192,7 +192,7 @@ def api_student_change_password(request):
 def api_student_profile(request):
     if request.method == "GET":
         return json_response(get_student_profile(request.student_id))
-    elif request.method in ("PUT", "POST"):
+    elif request.method in ("PUT", "POST", "PATCH"):
         data = parse_request_data(request)
         mark_completed = request.GET.get("completed", "").lower() == "true" or data.get("completed") is True
         return json_response(update_student_profile(request.student_id, data, mark_completed=mark_completed))
@@ -356,7 +356,7 @@ def api_client_dashboard_active_jobs(request):
 def api_client_profile(request):
     if request.method == "GET":
         return json_response(get_client_profile(request.client_id))
-    elif request.method in ("PUT", "POST"):
+    elif request.method in ("PUT", "POST", "PATCH"):
         data = parse_request_data(request)
         mark_completed = request.GET.get("completed", "").lower() == "true" or data.get("completed") is True
         return json_response(update_client_profile(request.client_id, data, mark_completed=mark_completed))
@@ -368,7 +368,7 @@ def api_client_jobs(request):
     if request.method == "GET":
         args = parse_request_data(request)
         return json_response(get_my_jobs(request.client_id, args))
-    elif request.method == "POST":
+    elif request.method in ("POST", "PUT", "PATCH"):
         data = parse_request_data(request)
         submit_now = data.pop("submit_now", False)
         return json_response(post_job(request.client_id, data, submit_now))
@@ -385,7 +385,7 @@ def api_client_job_detail(request, job_id):
     job_id = int(job_id)
     if request.method == "GET":
         return json_response(get_my_job_detail(request.client_id, job_id))
-    elif request.method in ("PUT", "POST"):
+    elif request.method in ("PUT", "POST", "PATCH"):
         data = parse_request_data(request)
         return json_response(edit_job(request.client_id, job_id, data))
     return json_response({"success": False, "message": "Method not allowed"}, status=405)

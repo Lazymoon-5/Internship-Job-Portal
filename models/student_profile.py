@@ -79,7 +79,7 @@ def update_profile(student_id: int, data: dict) -> bool:
     for field in updatable_fields:
         if field in data:
             set_clauses.append(f"{field} = %s")
-            values.append(data[field])
+            values.append(_sanitize_db_param(data[field]))
 
     if not set_clauses:
         return False  # nothing to update

@@ -50,6 +50,17 @@ def _calculate_completion(profile: dict) -> int:
     return round((filled / len(checklist)) * 100)
 
 
+def _sanitize_db_param(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple, set)):
+        return ", ".join(str(item) for item in val)
+    if isinstance(val, dict):
+        import json
+        return json.dumps(val)
+    return val
+
+
 def update_profile(client_id: int, data: dict) -> bool:
     """company_name is also editable (matches Basic Details section);
     email is intentionally never updatable."""
@@ -60,7 +71,7 @@ def update_profile(client_id: int, data: dict) -> bool:
     for field in updatable_fields:
         if field in data:
             set_clauses.append(f"{field} = %s")
-            values.append(data[field])
+            values.append(_sanitize_db_param(data[field]))
 
     if not set_clauses:
         return False

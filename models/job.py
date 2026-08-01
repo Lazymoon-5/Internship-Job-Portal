@@ -35,6 +35,17 @@ def _format_job_dates(jobs: list) -> list:
     return jobs
 
 
+def _sanitize_db_param(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple, set)):
+        return ", ".join(str(item) for item in val)
+    if isinstance(val, dict):
+        import json
+        return json.dumps(val)
+    return val
+
+
 def create_job(job_data: dict):
     """
     job_data = {client_id, title, description, job_type, required_skills,
@@ -47,11 +58,16 @@ def create_job(job_data: dict):
             """INSERT INTO jobs (client_id, title, description, job_type, department,
                required_skills, eligibility_criteria, location, salary_stipend, last_date_to_apply)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (job_data["client_id"], job_data["title"], job_data.get("description", ""),
-             job_data.get("job_type", "Internship"), job_data.get("department", ""),
-             job_data.get("required_skills", ""),
-             job_data.get("eligibility_criteria", ""), job_data.get("location", ""),
-             job_data.get("salary_stipend", ""), job_data.get("last_date_to_apply"))
+            (_sanitize_db_param(job_data["client_id"]),
+             _sanitize_db_param(job_data.get("title", "")),
+             _sanitize_db_param(job_data.get("description", "")),
+             _sanitize_db_param(job_data.get("job_type", "Internship")),
+             _sanitize_db_param(job_data.get("department", "")),
+             _sanitize_db_param(job_data.get("required_skills", "")),
+             _sanitize_db_param(job_data.get("eligibility_criteria", "")),
+             _sanitize_db_param(job_data.get("location", "")),
+             _sanitize_db_param(job_data.get("salary_stipend", "")),
+             job_data.get("last_date_to_apply"))
         )
         conn.commit()
         new_id = cursor.lastrowid
@@ -312,7 +328,7 @@ def update_job(job_id: int, client_id: int, data: dict) -> bool:
     for field in updatable_fields:
         if field in data:
             set_clauses.append(f"{field} = %s")
-            values.append(data[field])
+            values.append(_sanitize_db_param(data[field]))
 
     if not set_clauses:
         return False
