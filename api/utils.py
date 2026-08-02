@@ -38,11 +38,14 @@ def parse_request_data(request):
     return {}
 
 
+from django.core.serializers.json import DjangoJSONEncoder
+
+
 def json_response(payload, status=200):
     if isinstance(payload, tuple):
         res, st = payload
-        return JsonResponse(res, status=st, safe=False)
-    return JsonResponse(payload, status=status, safe=False)
+        return JsonResponse(res, status=st, safe=False, encoder=DjangoJSONEncoder)
+    return JsonResponse(payload, status=status, safe=False, encoder=DjangoJSONEncoder)
 
 
 class JsonExceptionMiddleware:

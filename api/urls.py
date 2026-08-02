@@ -19,8 +19,15 @@ urlpatterns = [
     path("student/profile/certifications/<int:certification_id>", views.api_student_delete_certification),
     path("student/profile/skills", views.api_student_skills),
     path("student/profile/skills/<int:skill_id>", views.api_student_delete_skill),
+    path("student/certifications", views.api_student_certifications),
+    path("student/certifications/<int:certification_id>", views.api_student_delete_certification),
+    path("student/skills", views.api_student_skills),
+    path("student/skills/<int:skill_id>", views.api_student_delete_skill),
 
     # Student Resumes
+    path("student/resumes", views.api_student_resumes),
+    path("student/resumes/<int:resume_id>/set-primary", views.api_student_set_primary_resume),
+    path("student/resumes/<int:resume_id>", views.api_student_delete_resume),
     path("student/resume", views.api_student_resumes),
     path("student/resume/<int:resume_id>/set-primary", views.api_student_set_primary_resume),
     path("student/resume/<int:resume_id>", views.api_student_delete_resume),
