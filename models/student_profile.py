@@ -21,6 +21,18 @@ PROFILE_FIELDS = [
 ]
 
 
+def _sanitize_db_param(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple, set)):
+        return ", ".join(str(item) for item in val)
+    if isinstance(val, dict):
+        import json
+        return json.dumps(val)
+    return val
+
+
+
 def get_profile(student_id: int):
     """Returns full profile dict, or None if student doesn't exist."""
     conn = get_db_connection()
