@@ -6,6 +6,7 @@ Mirrors controllers/student_controller.py exactly, but for Clients.
 """
 
 import os
+import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.client import (
     add_client,
@@ -38,7 +39,40 @@ def register_client(data):
             "message": f"Missing required field(s): {', '.join(missing)}"
         }, 400
 
-    email = data["email"].strip().lower()
+    company_name = str(data["company_name"]).strip()
+    if len(company_name) < 2:
+        return {"success": False, "message": "Company name must be at least 2 characters long."}, 400
+
+    email = str(data["email"]).strip().lower()
+    email_regex = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+    if not re.match(email_regex, email):
+        return {"success": False, "message": "Please provide a valid email address."}, 400
+
+    password = str(data["password"])
+    if len(password) < 8:
+        return {"success": False, "message": "Password must be at least 8 characters long."}, 400
+
+    address = str(data["address"]).strip()
+    if len(address) < 3:
+        return {"success": False, "message": "Please provide a valid address."}, 400
+
+    city = str(data["city"]).strip()
+    if len(city) < 2:
+        return {"success": False, "message": "City must be at least 2 characters long."}, 400
+
+    state = str(data["state"]).strip()
+    if len(state) < 2:
+        return {"success": False, "message": "State must be at least 2 characters long."}, 400
+
+    website = str(data.get("website") or "").strip()
+    if website:
+        url_regex = r"^(https?://)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$"
+        if not re.match(url_regex, website):
+            return {"success": False, "message": "Please provide a valid website URL."}, 400
+
+    pincode = str(data.get("pincode") or "").strip()
+    if pincode and not re.match(r"^\d{4,8}$", pincode):
+        return {"success": False, "message": "Pincode must contain 4 to 8 digits."}, 400
 
     if find_by_email(email):
         return {
@@ -46,14 +80,14 @@ def register_client(data):
             "message": "An account with this email already exists."
         }, 409
 
-    password_hash = generate_password_hash(data["password"])
+    password_hash = generate_password_hash(password)
 
     client = add_client({
-        "company_name": data["company_name"].strip(),
+        "company_name": company_name,
         "email": email,
         "password_hash": password_hash,
-        "industry": data["industry"].strip(),
-        "website": (data.get("website") or "").strip(),
+        "industry": str(data["industry"]).strip(),
+        "website": website,
     })
 
     # Address fields go into the same columns the profile wizard already

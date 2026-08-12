@@ -5,10 +5,26 @@ gap: companies can now actually create job posts through the app,
 instead of only via the test-seed script.
 """
 
+import re
 import models.job as job_model
 import models.client as client_model
 import models.notification as notification_model
 import models.admin as admin_model
+
+
+def _is_salary_negative(salary_stipend):
+    if not salary_stipend:
+        return False
+    val_str = str(salary_stipend).strip()
+    if re.search(r'-\s*\d+', val_str):
+        return True
+    try:
+        clean_num = re.sub(r'[^0-9.-]', '', val_str)
+        if clean_num and float(clean_num) < 0:
+            return True
+    except (ValueError, TypeError):
+        pass
+    return False
 
 
 def _notify_admins_job_pending(client_id, job_title):
@@ -35,6 +51,10 @@ def post_job(client_id, data, submit_now=False):
     title = (data.get("title") or "").strip()
     if not title:
         return {"success": False, "message": "Job title is required."}, 400
+
+    salary_stipend = data.get("salary_stipend", "")
+    if _is_salary_negative(salary_stipend):
+        return {"success": False, "message": "Salary / stipend cannot be a negative value."}, 400
 
     required_skills = data.get("required_skills")
     if isinstance(required_skills, list):
@@ -115,6 +135,9 @@ def edit_job(client_id, job_id, data):
             "success": False,
             "message": f"Cannot edit a job with status '{job['status']}'. Only Draft, Pending, or Rejected jobs can be edited."
         }, 400
+
+    if "salary_stipend" in data and _is_salary_negative(data["salary_stipend"]):
+        return {"success": False, "message": "Salary / stipend cannot be a negative value."}, 400
 
     job_model.update_job(job_id, client_id, data)
     return {"success": True, "message": "Job updated."}, 200

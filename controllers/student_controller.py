@@ -7,6 +7,7 @@ call controller, return response).
 """
 
 import os
+import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.student import (
     add_student,
@@ -41,7 +42,26 @@ def register_student(data):
             "message": f"Missing required field(s): {', '.join(missing)}"
         }, 400
 
-    email = data["email"].strip().lower()
+    name = str(data["name"]).strip()
+    if len(name) < 2:
+        return {"success": False, "message": "Full name must be at least 2 characters long."}, 400
+
+    email = str(data["email"]).strip().lower()
+    email_regex = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+    if not re.match(email_regex, email):
+        return {"success": False, "message": "Please provide a valid email address."}, 400
+
+    password = str(data["password"])
+    if len(password) < 8:
+        return {"success": False, "message": "Password must be at least 8 characters long."}, 400
+
+    college = str(data["college"]).strip()
+    if len(college) < 2:
+        return {"success": False, "message": "College/Institution name must be at least 2 characters long."}, 400
+
+    branch = str(data["branch"]).strip()
+    if len(branch) < 2:
+        return {"success": False, "message": "Branch name must be at least 2 characters long."}, 400
 
     if find_by_email(email):
         return {
@@ -49,7 +69,7 @@ def register_student(data):
             "message": "An account with this email already exists."
         }, 409
 
-    experience_level = (data.get("experience_level") or "Fresher").strip()
+    experience_level = str(data.get("experience_level") or "Fresher").strip()
     if experience_level not in ("Fresher", "Experienced"):
         return {
             "success": False,
@@ -62,20 +82,23 @@ def register_student(data):
     except (TypeError, ValueError):
         return {"success": False, "message": "years_of_experience must be a number."}, 400
 
-    if experience_level == "Experienced" and years_of_experience <= 0:
-        return {
-            "success": False,
-            "message": "years_of_experience is required and must be greater than 0 for Experienced students."
-        }, 400
+    if experience_level == "Experienced":
+        if years_of_experience <= 0:
+            return {
+                "success": False,
+                "message": "years_of_experience is required and must be greater than 0 for Experienced students."
+            }, 400
+        if years_of_experience > 50:
+            return {"success": False, "message": "years_of_experience cannot exceed 50."}, 400
 
-    password_hash = generate_password_hash(data["password"])
+    password_hash = generate_password_hash(password)
 
     student = add_student({
-        "name": data["name"].strip(),
+        "name": name,
         "email": email,
         "password_hash": password_hash,
-        "college": data["college"].strip(),
-        "branch": data["branch"].strip(),
+        "college": college,
+        "branch": branch,
         "experience_level": experience_level,
         "years_of_experience": years_of_experience,
     })
