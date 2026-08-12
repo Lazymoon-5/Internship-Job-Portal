@@ -33,23 +33,25 @@ def generate_admin_token(admin_id: int, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def generate_student_token(student_id: int, email: str) -> str:
+def generate_student_token(student_id: int, email: str, remember_me: bool = False) -> str:
+    expiry_delta = datetime.timedelta(days=30) if remember_me else datetime.timedelta(days=7)
     payload = {
         "student_id": student_id,
         "role": "student",
         "email": email,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=TOKEN_EXPIRY_MINUTES),
+        "exp": datetime.datetime.utcnow() + expiry_delta,
         "iat": datetime.datetime.utcnow(),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def generate_client_token(client_id: int, email: str) -> str:
+def generate_client_token(client_id: int, email: str, remember_me: bool = False) -> str:
+    expiry_delta = datetime.timedelta(days=30) if remember_me else datetime.timedelta(days=7)
     payload = {
         "client_id": client_id,
         "role": "client",
         "email": email,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=TOKEN_EXPIRY_MINUTES),
+        "exp": datetime.datetime.utcnow() + expiry_delta,
         "iat": datetime.datetime.utcnow(),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

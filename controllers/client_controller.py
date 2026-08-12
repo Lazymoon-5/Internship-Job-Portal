@@ -223,8 +223,9 @@ def login_client(data):
             "message": "Your company account has been blocked by an administrator. Contact support for help."
         }, 403
 
+    remember_me = bool(data.get("remember_me", False))
     from config.jwt_auth import generate_client_token
-    token = generate_client_token(client.id, client.email)
+    token = generate_client_token(client.id, client.email, remember_me=remember_me)
 
     return {
         "success": True,

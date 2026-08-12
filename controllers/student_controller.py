@@ -227,8 +227,9 @@ def login_student(data):
             "message": "Your account has been blocked by an administrator. Contact support for help."
         }, 403
 
+    remember_me = bool(data.get("remember_me", False))
     from config.jwt_auth import generate_student_token
-    token = generate_student_token(student.id, student.email)
+    token = generate_student_token(student.id, student.email, remember_me=remember_me)
 
     return {
         "success": True,
