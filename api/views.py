@@ -12,6 +12,7 @@ from controllers.student_controller import (
     resend_otp as resend_student_otp,
     google_login,
     forgot_password as student_forgot_pw,
+    verify_reset_otp as student_verify_reset_otp,
     reset_password as student_reset_pw,
     change_password as student_change_pw,
 )
@@ -51,6 +52,7 @@ from controllers.client_controller import (
     verify_registration_otp as verify_client_otp,
     resend_otp as resend_client_otp,
     forgot_password as client_forgot_pw,
+    verify_reset_otp as client_verify_reset_otp,
     reset_password as client_reset_pw,
     change_password as client_change_pw,
 )
@@ -175,6 +177,11 @@ def api_student_google_login(request):
 def api_student_forgot_password(request):
     data = parse_request_data(request)
     return json_response(student_forgot_pw(data))
+
+@csrf_exempt
+def api_student_verify_reset_otp(request):
+    data = parse_request_data(request)
+    return json_response(student_verify_reset_otp(data))
 
 @csrf_exempt
 def api_student_reset_password(request):
@@ -324,6 +331,11 @@ def api_client_resend_otp(request):
 def api_client_forgot_password(request):
     data = parse_request_data(request)
     return json_response(client_forgot_pw(data))
+
+@csrf_exempt
+def api_client_verify_reset_otp(request):
+    data = parse_request_data(request)
+    return json_response(client_verify_reset_otp(data))
 
 @csrf_exempt
 def api_client_reset_password(request):

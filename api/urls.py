@@ -9,6 +9,7 @@ urlpatterns = [
     path("student/resend-otp", views.api_student_resend_otp),
     path("student/google-login", views.api_student_google_login),
     path("student/forgot-password", views.api_student_forgot_password),
+    path("student/verify-reset-otp", views.api_student_verify_reset_otp),
     path("student/reset-password", views.api_student_reset_password),
     path("student/change-password", views.api_student_change_password),
 
@@ -51,6 +52,7 @@ urlpatterns = [
     path("client/verify-otp", views.api_client_verify_otp),
     path("client/resend-otp", views.api_client_resend_otp),
     path("client/forgot-password", views.api_client_forgot_password),
+    path("client/verify-reset-otp", views.api_client_verify_reset_otp),
     path("client/reset-password", views.api_client_reset_password),
     path("client/change-password", views.api_client_change_password),
     path("client/dashboard/stats", views.api_client_dashboard_stats),
