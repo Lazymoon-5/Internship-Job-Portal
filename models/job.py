@@ -11,7 +11,7 @@ create_job() exists here so this file is ready for the future Company
 already built for it.
 """
 
-from config.database import get_db_connection
+from config.database import get_db_connection, _sanitize_db_param
 import datetime
 
 

@@ -7,7 +7,7 @@ Student "Apply for Job" API — not part of this delivery, but the model
 layer is already built for it.
 """
 
-from config.database import get_db_connection
+from config.database import get_db_connection, _sanitize_db_param
 
 
 def _sanitize_db_param(val):

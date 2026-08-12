@@ -10,7 +10,7 @@ a Dashboard feature layered on top of an already-required database
 (consistent with jobs/applications/resumes).
 """
 
-from config.database import get_db_connection
+from config.database import get_db_connection, _sanitize_db_param
 
 PROFILE_FIELDS = [
     "department", "current_year", "mobile_no", "profile_summary",
@@ -19,17 +19,6 @@ PROFILE_FIELDS = [
     "experience_level", "years_of_experience", "job_designation",
     "experience_company", "experience_duration",
 ]
-
-
-def _sanitize_db_param(val):
-    if val is None:
-        return None
-    if isinstance(val, (list, tuple, set)):
-        return ", ".join(str(item) for item in val)
-    if isinstance(val, dict):
-        import json
-        return json.dumps(val)
-    return val
 
 
 

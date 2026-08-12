@@ -64,6 +64,20 @@ def get_db_connection():
     return get_pool().get_connection()
 
 
+def _sanitize_db_param(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple, set)):
+        return ", ".join(str(item) for item in val)
+    if isinstance(val, dict):
+        import json
+        return json.dumps(val)
+    return val
+
+
+sanitize_db_param = _sanitize_db_param
+
+
 def init_db():
     if not is_db_available():
         print("[DB] Skipping table creation — DB not configured/reachable. Using in-memory storage.")

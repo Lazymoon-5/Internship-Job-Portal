@@ -4,7 +4,7 @@ to the clients table for the Company Dashboard. Mirrors
 models/student_profile.py in pattern.
 """
 
-from config.database import get_db_connection
+from config.database import get_db_connection, _sanitize_db_param
 
 PROFILE_FIELDS = [
     "contact", "company_size", "year_established", "city", "pincode", "state",
