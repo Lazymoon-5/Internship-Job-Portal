@@ -93,27 +93,30 @@ def add_student(student_data: dict):
 
 
 def find_by_email(email: str):
-    email = email.lower()
+    email = (email or "").strip().lower()
 
     if is_db_available():
-        conn = get_db_connection()
         try:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM students WHERE email = %s", (email,))
-            row = cursor.fetchone()
-            cursor.close()
-            if not row:
-                return None
-            return Student(**{k: row[k] for k in
-                               ["id", "name", "email", "password_hash", "college",
-                                "branch", "is_verified", "google_id", "status",
-                                "experience_level", "years_of_experience"]})
-        finally:
-            conn.close()
+            conn = get_db_connection()
+            try:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT * FROM students WHERE LOWER(email) = %s", (email,))
+                row = cursor.fetchone()
+                cursor.close()
+                if not row:
+                    return None
+                return Student(**{k: row[k] for k in
+                                   ["id", "name", "email", "password_hash", "college",
+                                    "branch", "is_verified", "google_id", "status",
+                                    "experience_level", "years_of_experience"] if k in row})
+            finally:
+                conn.close()
+        except Exception as e:
+            print(f"[DB FIND STUDENT EMAIL ERROR] {e}")
 
     # --- in-memory fallback ---
     for record in _memory_students:
-        if record["email"].lower() == email:
+        if record.get("email", "").strip().lower() == email:
             return Student(**record)
     return None
 

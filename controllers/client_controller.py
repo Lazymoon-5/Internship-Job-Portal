@@ -262,7 +262,7 @@ def forgot_password(data):
     if not client:
         return {
             "success": False,
-            "message": f"No company account registered with email '{email}'. Please check your email address or log in as a student."
+            "message": f"No company account registered with email '{email}'. Please check your email address."
         }, 404
 
     otp_code = create_otp(email, purpose="password_reset")

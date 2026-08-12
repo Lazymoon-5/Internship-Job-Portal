@@ -79,26 +79,29 @@ def add_client(client_data: dict):
 
 
 def find_by_email(email: str):
-    email = email.lower()
+    email = (email or "").strip().lower()
 
     if is_db_available():
-        conn = get_db_connection()
         try:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM clients WHERE email = %s", (email,))
-            row = cursor.fetchone()
-            cursor.close()
-            if not row:
-                return None
-            return Client(**{k: row[k] for k in
-                              ["id", "company_name", "email", "password_hash",
-                               "industry", "website", "is_verified", "admin_status"]})
-        finally:
-            conn.close()
+            conn = get_db_connection()
+            try:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT * FROM clients WHERE LOWER(email) = %s", (email,))
+                row = cursor.fetchone()
+                cursor.close()
+                if not row:
+                    return None
+                return Client(**{k: row[k] for k in
+                                  ["id", "company_name", "email", "password_hash",
+                                   "industry", "website", "is_verified", "admin_status"] if k in row})
+            finally:
+                conn.close()
+        except Exception as e:
+            print(f"[DB FIND CLIENT EMAIL ERROR] {e}")
 
     # --- in-memory fallback ---
     for record in _memory_clients:
-        if record["email"].lower() == email:
+        if record.get("email", "").strip().lower() == email:
             return Client(**record)
     return None
 
