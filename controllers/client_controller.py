@@ -261,16 +261,16 @@ def forgot_password(data):
 
     if not client:
         return {
-            "success": True,
-            "message": "If an account with this email exists, a 6-digit OTP has been sent."
-        }, 200
+            "success": False,
+            "message": f"No company account registered with email '{email}'. Please check your email address or log in as a student."
+        }, 404
 
     otp_code = create_otp(email, purpose="password_reset")
     email_sent = send_otp_email(email, otp_code)
 
     response = {
         "success": True,
-        "message": "A 6-digit OTP code has been sent to your email address.",
+        "message": f"A 6-digit OTP code has been sent to {email}.",
     }
     if not email_sent:
         response["dev_otp"] = otp_code
