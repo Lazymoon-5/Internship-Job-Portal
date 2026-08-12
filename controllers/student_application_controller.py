@@ -2,12 +2,23 @@ import models.application as application_model
 import models.resume as resume_model
 import models.job as job_model
 import models.student as student_model
+import models.student_profile as student_profile_model
 import models.client as client_model
 import models.notification as notification_model
 from config.email_service import send_application_confirmation_email, send_new_applicant_email
 
 
 def apply_to_job(student_id, job_id, data):
+    # Enforce student profile completion (min 90%)
+    profile = student_profile_model.get_profile(student_id)
+    if profile:
+        completion = profile.get("profile_completion", 0)
+        if completion < 90:
+            return {
+                "success": False,
+                "message": f"Complete your profile to apply for Jobs (at least 90% completion required, current: {completion}%)."
+            }, 400
+
     cover_letter = data.get("cover_letter", "")
     portfolio_link = data.get("portfolio_link", "")
     resume_id = data.get("resume_id")

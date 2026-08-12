@@ -3,6 +3,7 @@ from controllers.client_controller import (
     register_client,
     login_client,
     forgot_password,
+    verify_reset_otp,
     reset_password,
     verify_registration_otp,
     resend_otp,
@@ -45,6 +46,13 @@ def resend_otp_route():
 def forgot_password_route():
     data = request.get_json(silent=True) or {}
     response, status_code = forgot_password(data)
+    return jsonify(response), status_code
+
+
+@client_bp.route("/verify-reset-otp", methods=["POST"])
+def verify_reset_otp_route():
+    data = request.get_json(silent=True) or {}
+    response, status_code = verify_reset_otp(data)
     return jsonify(response), status_code
 
 

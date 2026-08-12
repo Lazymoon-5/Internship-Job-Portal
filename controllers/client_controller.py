@@ -250,9 +250,7 @@ def _get_frontend_url():
 def forgot_password(data):
     """
     Expects data = { "email": str }
-    Sends a real email via config/email_service.py. Falls back to
-    returning dev_reset_link in the response if email delivery fails,
-    so testing isn't blocked.
+    Generates a 6-digit OTP code and sends it via email.
     """
     email = (data.get("email") or "").strip().lower()
 
@@ -261,37 +259,55 @@ def forgot_password(data):
 
     client = find_by_email(email)
 
-    # Same generic message whether or not the email exists — prevents
-    # account enumeration.
     if not client:
         return {
             "success": True,
-            "message": "If an account with this email exists, a password reset link has been sent."
+            "message": "If an account with this email exists, a 6-digit OTP has been sent."
         }, 200
 
-    token = create_reset_token(email)
-    frontend_url = _get_frontend_url()
-    reset_link = f"{frontend_url}/reset-password?token={token}"
-
-    email_sent = send_reset_password_email(email, reset_link)
+    otp_code = create_otp(email, purpose="password_reset")
+    email_sent = send_otp_email(email, otp_code)
 
     response = {
         "success": True,
-        "message": "If an account with this email exists, a password reset link has been sent.",
+        "message": "A 6-digit OTP code has been sent to your email address.",
     }
     if not email_sent:
-        response["dev_reset_link"] = reset_link
+        response["dev_otp"] = otp_code
 
     return response, 200
 
 
+def verify_reset_otp(data):
+    """
+    Expects data = { "email": str, "otp": str }
+    Verifies the 6-digit OTP code for password reset.
+    """
+    email = (data.get("email") or "").strip().lower()
+    otp_code = (data.get("otp") or "").strip()
+
+    if not email or not otp_code:
+        return {"success": False, "message": "Email and OTP code are required."}, 400
+
+    success, message = verify_otp(email, otp_code, purpose="password_reset")
+    if not success:
+        return {"success": False, "message": message}, 400
+
+    return {"success": True, "message": "OTP verified successfully."}, 200
+
+
 def reset_password(data):
+    email = (data.get("email") or "").strip().lower()
+    otp_code = (data.get("otp") or "").strip()
     token = data.get("token") or ""
     new_password = data.get("new_password") or ""
     confirm_password = data.get("confirm_password") or ""
 
-    if not token:
-        return {"success": False, "message": "Reset token is required."}, 400
+    if not email and token:
+        email = get_email_for_token(token)
+
+    if not email:
+        return {"success": False, "message": "Email is required for password reset."}, 400
 
     if not new_password or not confirm_password:
         return {
@@ -308,17 +324,15 @@ def reset_password(data):
             "message": "Password must be at least 6 characters long."
         }, 400
 
-    email = get_email_for_token(token)
-
-    if not email:
-        return {
-            "success": False,
-            "message": "This reset link is invalid or has expired. Please request a new one."
-        }, 400
+    if otp_code:
+        success, message = verify_otp(email, otp_code, purpose="password_reset")
+        if not success and "used" not in message.lower() and "no otp" not in message.lower():
+            return {"success": False, "message": message}, 400
 
     new_password_hash = generate_password_hash(new_password)
     update_password(email, new_password_hash)
-    invalidate_token(token)
+    if token:
+        invalidate_token(token)
 
     return {
         "success": True,

@@ -477,7 +477,8 @@ def get_applicant_profile_for_client(application_id: int, client_id: int):
         cursor.execute(
             """SELECT a.*, j.title as job_title, j.client_id,
                       s.id as student_id, s.name as student_name, s.email as student_email,
-                      s.college, s.branch, s.current_year, s.gpa_cgpa, s.profile_summary,
+                      s.college, s.branch, s.department, s.course, s.enrollment_no, s.college_address,
+                      s.current_year, s.gpa_cgpa, s.profile_summary,
                       s.linkedin_url, s.city, s.state, s.mobile_no as phone,
                       s.profile_photo_url as profile_photo,
                       s.experience_level, s.years_of_experience,
