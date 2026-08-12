@@ -23,45 +23,60 @@ DB_CONFIG = {
 DB_CONFIGURED = bool(DB_CONFIG["host"])
 
 _pool = None
-_connection_verified = False
-_connection_failed = False
-
-
-def is_db_available() -> bool:
-    global _connection_verified, _connection_failed
-    if not DB_CONFIGURED:
-        return False
-    if _connection_verified:
-        return True
-    if _connection_failed:
-        return False
-    try:
-        conn = get_db_connection()
-        conn.close()
-        _connection_verified = True
-        return True
-    except Exception as e:
-        print(f"[DB] Not reachable ({e}) — falling back to in-memory storage.")
-        _connection_failed = True
-        return False
 
 
 def get_pool():
     global _pool
     if _pool is None:
-        from mysql.connector import pooling
-        _pool = pooling.MySQLConnectionPool(
-            pool_name="placify_pool", pool_size=20,
-            host=DB_CONFIG["host"], port=DB_CONFIG["port"],
-            user=DB_CONFIG["user"], password=DB_CONFIG["password"],
-            database=DB_CONFIG["database"], charset=DB_CONFIG["charset"],
-            connection_timeout=5,
-        )
+        try:
+            from mysql.connector import pooling
+            _pool = pooling.MySQLConnectionPool(
+                pool_name="placify_pool",
+                pool_size=5,
+                host=DB_CONFIG["host"],
+                port=DB_CONFIG["port"],
+                user=DB_CONFIG["user"],
+                password=DB_CONFIG["password"],
+                database=DB_CONFIG["database"],
+                charset=DB_CONFIG["charset"],
+                connection_timeout=5,
+            )
+        except Exception as e:
+            print(f"[DB POOL INIT WARNING] {e}")
+            _pool = None
     return _pool
 
 
 def get_db_connection():
-    return get_pool().get_connection()
+    pool = get_pool()
+    if pool:
+        try:
+            return pool.get_connection()
+        except Exception as pool_err:
+            print(f"[DB POOL EXHAUSTED] {pool_err} — falling back to direct connection")
+
+    import mysql.connector
+    return mysql.connector.connect(
+        host=DB_CONFIG["host"],
+        port=DB_CONFIG["port"],
+        user=DB_CONFIG["user"],
+        password=DB_CONFIG["password"],
+        database=DB_CONFIG["database"],
+        charset=DB_CONFIG["charset"],
+        connection_timeout=10,
+    )
+
+
+def is_db_available() -> bool:
+    if not DB_CONFIGURED:
+        return False
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[DB CHECK WARNING] {e}")
+        return False
 
 
 def _sanitize_db_param(val):
