@@ -100,6 +100,7 @@ def get_application_by_id(application_id: int):
             """SELECT a.*,
                       s.id as student_id,
                       s.name as student_name, s.email as student_email,
+                      s.college, s.branch, s.course, s.department, s.enrollment_no, s.college_address,
                       s.college as student_college, s.branch as student_branch,
                       s.current_year, s.gpa_cgpa, s.mobile_no as phone,
                       s.profile_summary, s.profile_photo_url as profile_photo,
@@ -121,7 +122,7 @@ def get_application_by_id(application_id: int):
         if row:
             cursor2 = conn.cursor(dictionary=True)
             cursor2.execute(
-                "SELECT skill_name, level FROM skills WHERE student_id = %s", (row["student_id"],)
+                "SELECT skill_name as name, skill_name, level FROM skills WHERE student_id = %s", (row["student_id"],)
             )
             row["skills"] = cursor2.fetchall()
             cursor2.close()
