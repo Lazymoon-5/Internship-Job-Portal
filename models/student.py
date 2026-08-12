@@ -343,7 +343,12 @@ def verify_otp(email: str, otp_code: str, purpose: str = "registration"):
     otp_code = str(otp_code or "").strip()
 
     if is_db_available():
-        conn = get_db_connection()
+        try:
+            conn = get_db_connection()
+        except Exception as db_err:
+            print(f"[VERIFY OTP DB CONN ERROR] {db_err}")
+            return False, "Database server busy. Please click Verify OTP again."
+
         try:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
