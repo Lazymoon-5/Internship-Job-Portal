@@ -266,7 +266,8 @@ def create_otp(email: str, purpose: str = "registration") -> str:
 
 
 def verify_otp(email: str, otp_code: str, purpose: str = "registration"):
-    email = email.lower()
+    email = (email or "").strip().lower()
+    otp_code = str(otp_code or "").strip()
 
     if is_db_available():
         conn = get_db_connection()
@@ -274,7 +275,7 @@ def verify_otp(email: str, otp_code: str, purpose: str = "registration"):
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
                 """SELECT * FROM client_otp_verifications
-                   WHERE email = %s AND purpose = %s AND is_used = FALSE
+                   WHERE email = %s AND purpose = %s
                    ORDER BY created_at DESC LIMIT 1""",
                 (email, purpose)
             )
@@ -283,20 +284,28 @@ def verify_otp(email: str, otp_code: str, purpose: str = "registration"):
             if not row:
                 cursor.close()
                 return False, "No OTP request found. Please request a new one."
-            if datetime.datetime.utcnow() > row["expires_at"]:
+
+            stored_code = str(row["otp_code"]).strip()
+
+            if row.get("is_used"):
+                if stored_code == otp_code:
+                    cursor.close()
+                    return True, "OTP verified successfully."
                 cursor.close()
-                return False, "OTP has expired. Please request a new one."
+                return False, "This OTP has already been used. Please request a new one."
+
             if row["attempts"] >= OTP_MAX_ATTEMPTS:
                 cursor.close()
                 return False, "Too many incorrect attempts. Please request a new OTP."
-            if row["otp_code"] != otp_code:
+
+            if stored_code != otp_code:
                 c2 = conn.cursor()
                 c2.execute("UPDATE client_otp_verifications SET attempts = attempts + 1 WHERE id = %s",
                            (row["id"],))
                 conn.commit()
                 c2.close()
                 cursor.close()
-                return False, "Incorrect OTP. Please try again."
+                return False, "Incorrect OTP code. Please check and try again."
 
             c2 = conn.cursor()
             c2.execute("UPDATE client_otp_verifications SET is_used = TRUE WHERE id = %s", (row["id"],))
@@ -309,15 +318,18 @@ def verify_otp(email: str, otp_code: str, purpose: str = "registration"):
 
     # --- in-memory fallback ---
     entry = _memory_otps.get((email, purpose))
-    if not entry or entry["is_used"]:
+    if not entry:
         return False, "No OTP request found. Please request a new one."
-    if datetime.datetime.utcnow() > entry["expires_at"]:
-        return False, "OTP has expired. Please request a new one."
+    stored_code = str(entry["otp_code"]).strip()
+    if entry.get("is_used"):
+        if stored_code == otp_code:
+            return True, "OTP verified successfully."
+        return False, "This OTP has already been used. Please request a new one."
     if entry["attempts"] >= OTP_MAX_ATTEMPTS:
         return False, "Too many incorrect attempts. Please request a new OTP."
-    if entry["otp_code"] != otp_code:
+    if stored_code != otp_code:
         entry["attempts"] += 1
-        return False, "Incorrect OTP. Please try again."
+        return False, "Incorrect OTP code. Please check and try again."
     entry["is_used"] = True
     return True, "OTP verified successfully."
 
