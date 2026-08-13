@@ -40,9 +40,6 @@ def update_profile(student_id, data, mark_completed=False):
     if mark_completed:
         profile_model.mark_profile_completed(student_id)
 
-    if not updated and not mark_completed:
-        return {"success": False, "message": "No valid fields provided to update."}, 400
-
     return {"success": True, "message": "Profile updated successfully."}, 200
 
 
