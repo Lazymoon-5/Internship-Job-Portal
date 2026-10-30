@@ -20,7 +20,18 @@ def get_profile(student_id):
     profile["skills"] = skill_model.list_skills(student_id)
     profile["experiences"] = experience_model.list_experiences(student_id)
 
-    return {"success": True, "profile": profile}, 200
+    can_apply, missing_sections, missing_fields = profile_model.get_apply_eligibility(student_id)
+    profile["can_apply"] = can_apply
+    profile["missing_sections"] = missing_sections
+    profile["missing_fields"] = missing_fields
+
+    return {
+        "success": True,
+        "profile": profile,
+        "can_apply": can_apply,
+        "missing_sections": missing_sections,
+        "missing_fields": missing_fields,
+    }, 200
 
 
 def update_profile(student_id, data, mark_completed=False):

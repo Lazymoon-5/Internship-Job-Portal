@@ -231,10 +231,23 @@ def login_student(data):
     from config.jwt_auth import generate_student_token
     token = generate_student_token(student.id, student.email, remember_me=remember_me)
 
+    student_dict = student.to_dict()
+    try:
+        from models.student_profile import get_profile, get_apply_eligibility
+        prof = get_profile(student.id)
+        if prof:
+            student_dict["profile_completion"] = prof.get("profile_completion", 0)
+        can_apply, missing_sections, missing_fields = get_apply_eligibility(student.id)
+        student_dict["can_apply"] = can_apply
+        student_dict["missing_sections"] = missing_sections
+        student_dict["missing_fields"] = missing_fields
+    except Exception as e:
+        print(f"[LOGIN PROFILE ENRICH] {e}")
+
     return {
         "success": True,
         "message": "Login successful.",
-        "student": student.to_dict(),
+        "student": student_dict,
         "token": token
     }, 200
 
@@ -274,10 +287,23 @@ def google_login(data):
     from config.jwt_auth import generate_student_token
     token = generate_student_token(student.id, student.email)
 
+    student_dict = student.to_dict()
+    try:
+        from models.student_profile import get_profile, get_apply_eligibility
+        prof = get_profile(student.id)
+        if prof:
+            student_dict["profile_completion"] = prof.get("profile_completion", 0)
+        can_apply, missing_sections, missing_fields = get_apply_eligibility(student.id)
+        student_dict["can_apply"] = can_apply
+        student_dict["missing_sections"] = missing_sections
+        student_dict["missing_fields"] = missing_fields
+    except Exception as e:
+        print(f"[GOOGLE LOGIN PROFILE ENRICH] {e}")
+
     return {
         "success": True,
         "message": "Login successful via Google.",
-        "student": student.to_dict(),
+        "student": student_dict,
         "token": token
     }, 200
 

@@ -9,15 +9,22 @@ from config.email_service import send_application_confirmation_email, send_new_a
 
 
 def apply_to_job(student_id, job_id, data):
-    # Enforce student profile completion (min 90%)
-    profile = student_profile_model.get_profile(student_id)
-    if profile:
-        completion = profile.get("profile_completion", 0)
-        if completion < 90:
-            return {
-                "success": False,
-                "message": f"Complete your profile to apply for Jobs (at least 90% completion required, current: {completion}%)."
-            }, 400
+    # Enforce student profile eligibility using single source of truth helper
+    can_apply, missing_sections, missing_fields = student_profile_model.get_apply_eligibility(student_id)
+    if not can_apply:
+        sections_str = ", ".join(missing_sections)
+        msg = f"Complete these sections to apply: {sections_str}."
+        if "Work Experience" in missing_sections:
+            prof = student_profile_model.get_profile(student_id)
+            if not prof or not (prof.get("experience_level") or "").strip():
+                msg += " Select Fresher or Experienced in your profile."
+        return {
+            "success": False,
+            "message": msg,
+            "can_apply": False,
+            "missing_sections": missing_sections,
+            "missing_fields": missing_fields,
+        }, 400
 
     cover_letter = data.get("cover_letter", "")
     portfolio_link = data.get("portfolio_link", "")
